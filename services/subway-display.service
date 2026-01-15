@@ -1,0 +1,24 @@
+[Unit]
+Description=NYC Subway Sign LED Display
+Documentation=https://github.com/yourusername/subway-sign
+After=network-online.target subway-server.service
+Wants=network-online.target
+Requires=subway-server.service
+
+[Service]
+Type=simple
+# Must run as root for GPIO access to LED matrix
+User=root
+Group=root
+WorkingDirectory=/home/pi/subway-sign/display
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Give the server time to start before display tries to connect
+ExecStartPre=/bin/sleep 5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+# Python dependencies for the LED matrix display
+# Install with: pip3 install -r requirements.txt
+
+requests>=2.28.0
+
+# Note: The rgbmatrix library must be built from source on Raspberry Pi
+# See: https://github.com/hzeller/rpi-rgb-led-matrix
+# Build instructions in project README
