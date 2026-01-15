@@ -162,9 +162,9 @@ class SubwayDisplay:
             # Simulation mode - just print
             if arrivals:
                 times = [f"{a['route']}:{a['minutesUntil']}m" for a in arrivals]
-                print(f"  {row_key}: {', '.join(times)}")
+                print(f"  {row_key}: {', '.join(times)}", flush=True)
             else:
-                print(f"  {row_key}: ---")
+                print(f"  {row_key}: ---", flush=True)
             return
 
         y = ROW_POSITIONS.get(row_key, 0)
@@ -266,34 +266,35 @@ def fetch_arrivals(port=None):
 
 def main():
     """Main display loop."""
-    print("NYC Subway Sign Display")
-    print("=" * 40)
-    print(f"Matrix available: {HAS_MATRIX}")
-    print(f"API server port: {CONFIG['server']['port']}")
-    print(f"Refresh interval: {CONFIG['server']['refreshInterval']}ms")
-    print("=" * 40)
+    print("NYC Subway Sign Display", flush=True)
+    print("=" * 40, flush=True)
+    print(f"Matrix available: {HAS_MATRIX}", flush=True)
+    print(f"API server port: {CONFIG['server']['port']}", flush=True)
+    print(f"Refresh interval: {CONFIG['server']['refreshInterval']}ms", flush=True)
+    print("=" * 40, flush=True)
 
     display = SubwayDisplay()
     refresh_seconds = CONFIG['server']['refreshInterval'] / 1000
 
-    print("\nStarting display loop. Press Ctrl+C to exit.\n")
+    print("\nStarting display loop. Press Ctrl+C to exit.\n", flush=True)
 
     try:
         while True:
             data = fetch_arrivals()
 
             if data:
-                print(f"[{time.strftime('%H:%M:%S')}] Updated arrivals:")
+                print(f"[{time.strftime('%H:%M:%S')}] Updated arrivals:", flush=True)
                 display.update(data)
+                sys.stdout.flush()
             else:
                 display.draw_error("NO DATA")
 
             time.sleep(refresh_seconds)
 
     except KeyboardInterrupt:
-        print("\n\nShutting down...")
+        print("\n\nShutting down...", flush=True)
         display.clear()
-        print("Display cleared. Goodbye!")
+        print("Display cleared. Goodbye!", flush=True)
 
 
 if __name__ == '__main__':
