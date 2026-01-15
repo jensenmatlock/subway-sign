@@ -1,0 +1,18 @@
+{
+  "name": "subway-sign-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "NYC Subway arrival time API server for LED matrix display",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "gtfs-realtime-bindings": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

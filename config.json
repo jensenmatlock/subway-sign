@@ -1,0 +1,50 @@
+{
+  "stations": {
+    "72_cpw": {
+      "id": "A22",
+      "name": "72 St - Central Park West",
+      "lines": ["A", "B", "C"]
+    },
+    "72_broadway": {
+      "id": "121",
+      "name": "72 St - Broadway",
+      "lines": ["1", "2", "3"]
+    }
+  },
+  "direction": "S",
+  "display": {
+    "rows": 32,
+    "cols": 64,
+    "brightness": 50,
+    "gpio_slowdown": 4
+  },
+  "layout": {
+    "row1": {
+      "station": "72_cpw",
+      "lines": ["B"],
+      "feed": "bdfm",
+      "label": "B to Herald Sq"
+    },
+    "row2": {
+      "station": "72_cpw",
+      "lines": ["A", "C"],
+      "feed": "ace",
+      "label": "A/C to Penn"
+    },
+    "row3": {
+      "station": "72_broadway",
+      "lines": ["1", "2", "3"],
+      "feed": "123",
+      "label": "1/2/3 Downtown"
+    }
+  },
+  "feeds": {
+    "bdfm": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
+    "ace": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
+    "123": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs"
+  },
+  "server": {
+    "port": 3000,
+    "refreshInterval": 30000
+  }
+}
