@@ -76,7 +76,7 @@ class SubwayDisplay:
         options.cols = CONFIG['display']['cols']
         options.brightness = CONFIG['display']['brightness']
         options.gpio_slowdown = CONFIG['display']['gpio_slowdown']
-        options.hardware_mapping = 'adafruit-hat'
+        options.hardware_mapping = CONFIG['display'].get('hardware_mapping', 'regular')
         options.drop_privileges = False
 
         self.matrix = RGBMatrix(options=options)

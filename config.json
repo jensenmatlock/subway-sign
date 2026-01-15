@@ -16,7 +16,8 @@
     "rows": 32,
     "cols": 64,
     "brightness": 50,
-    "gpio_slowdown": 4
+    "gpio_slowdown": 4,
+    "hardware_mapping": "regular"
   },
   "layout": {
     "row1": {
