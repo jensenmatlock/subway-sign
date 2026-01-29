@@ -49,11 +49,12 @@ LINE_COLORS = {
     'S': (128, 128, 128),
 }
 
-# Row Y positions for 32-pixel height display (3 rows of ~10px each)
+# Row Y positions for 32-pixel height display (3 rows, no gaps)
+# Each row gets ~10px: rows at 0, 10, 21 fills the full 32px height
 ROW_POSITIONS = {
     'row1': 0,
-    'row2': 11,
-    'row3': 22,
+    'row2': 10,
+    'row3': 21,
 }
 
 
@@ -193,16 +194,22 @@ class SubwayDisplay:
             # Draw the line bullet
             x += self.draw_line_bullet(x, y, route)
 
-            # Draw up to 2 arrival times for this route
+            # Draw up to 2 arrival times for this route, comma-separated
+            white = graphics.Color(200, 200, 200)
+            gray = graphics.Color(120, 120, 120)
             for i, mins in enumerate(times[:2]):
+                if i > 0:
+                    # Draw comma separator
+                    graphics.DrawText(self.canvas, self.font, x, y + 6, gray, ",")
+                    x += 4  # comma width + spacing
+
                 if mins < 1:
                     time_text = "Now"
                 else:
                     time_text = f"{mins}"
 
-                white = graphics.Color(200, 200, 200)
                 graphics.DrawText(self.canvas, self.font, x, y + 6, white, time_text)
-                x += len(time_text) * 5 + 2  # 5px per char + spacing
+                x += len(time_text) * 5 + 1  # 5px per char + spacing
 
             x += 3  # Space before next route
 
