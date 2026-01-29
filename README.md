@@ -28,12 +28,13 @@ Real-time NYC subway arrival display for Raspberry Pi with RGB LED matrix.
 
 | Component | Specification |
 |-----------|---------------|
-| Raspberry Pi | Pi 3B+, Pi 4, or Pi Zero 2W |
+| Raspberry Pi | Pi Zero 2 WH, Pi 3B+, or Pi 4 |
 | LED Matrix | 64x32 RGB, P4 pitch, HUB75 interface |
-| Driver | Adafruit RGB Matrix Bonnet |
-| Power | 5V 4A power supply |
+| Driver | HUB75 RGB Matrix Adapter Board (or Adafruit Bonnet) |
+| Power | 5V 4A power supply, 2.1mm barrel jack |
+| MicroSD Card | 16GB+ Class 10 |
 
-**Recommended purchase:** [Adafruit](https://www.adafruit.com/) for US shipping, or search "64x32 P4 RGB LED Matrix HUB75" on Amazon/AliExpress.
+**Note on driver boards:** This project supports both generic HUB75 adapter boards (`"hardware_mapping": "regular"` in config) and the Adafruit RGB Matrix Bonnet (`"hardware_mapping": "adafruit-hat"`). Most Amazon HUB75 adapter boards use the `regular` pinout.
 
 ## Project Structure
 
@@ -47,11 +48,11 @@ subway-sign/
 │       ├── arrival-parser.js
 │       └── station-lookup.js
 ├── display/                 # Python LED matrix display
-│   └── main.py
-├── scripts/                 # Setup scripts
-│   ├── setup-pi.sh
-│   └── install-services.sh
-└── services/                # systemd service files
+│   ├── main.py
+│   └── requirements.txt
+└── scripts/                 # Setup & service install scripts
+    ├── setup-pi.sh          # One-time Pi setup
+    └── install-services.sh  # Generates & installs systemd services
 ```
 
 ## Quick Start (Local Development)
@@ -98,34 +99,38 @@ In the imager settings (gear icon), configure:
 
 ### 2. Hardware Assembly
 
-1. Attach the RGB Matrix Bonnet to the Pi's GPIO header
-2. Connect the 16-pin ribbon cable from Bonnet to matrix INPUT
-3. Connect matrix power wires to Bonnet screw terminals (red→+, black→-)
-4. Connect 5V 4A power supply to Bonnet barrel jack
+1. Attach the HUB75 adapter board to the Pi's GPIO header
+2. Connect the 16-pin ribbon cable from adapter to matrix INPUT
+3. Connect matrix power wires to adapter power output terminals (red→+, black→-)
+4. Connect 5V 4A power supply to adapter barrel jack or USB-C input
 
 ### 3. Software Installation
 
 SSH into your Pi and run:
 
 ```bash
+# Install git (not included in Raspberry Pi OS Lite)
+sudo apt update && sudo apt install -y git
+
 # Clone the repo
 cd ~
 git clone https://github.com/jensenmatlock/subway-sign.git
 cd subway-sign
 
-# Run setup script (installs Node.js, builds LED matrix library)
-sudo ./scripts/setup-pi.sh
+# Run setup script (installs Node.js, Python deps, builds LED matrix library)
+sudo bash scripts/setup-pi.sh
 
-# Reboot (required for audio disable to take effect)
+# IMPORTANT: Reboot is required before the display will work
+# (disables onboard audio which conflicts with LED matrix GPIO)
 sudo reboot
 ```
 
 After reboot:
 
 ```bash
-# Install systemd services
+# Install systemd services (generates service files with correct paths/user)
 cd ~/subway-sign
-sudo ./scripts/install-services.sh
+sudo bash scripts/install-services.sh
 
 # Start the services
 sudo systemctl start subway-server subway-display

@@ -83,13 +83,14 @@ class SubwayDisplay:
         self.canvas = self.matrix.CreateFrameCanvas()
 
         # Load fonts from rpi-rgb-led-matrix fonts directory
+        font_dir = Path.home() / 'rpi-rgb-led-matrix' / 'fonts'
         self.font = graphics.Font()
-        self.font.LoadFont("/home/pi/rpi-rgb-led-matrix/fonts/5x7.bdf")
+        self.font.LoadFont(str(font_dir / '5x7.bdf'))
 
         # Smaller font for "min" text if available
         self.font_small = graphics.Font()
         try:
-            self.font_small.LoadFont("/home/pi/rpi-rgb-led-matrix/fonts/4x6.bdf")
+            self.font_small.LoadFont(str(font_dir / '4x6.bdf'))
         except:
             self.font_small = self.font
 

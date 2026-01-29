@@ -21,6 +21,13 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+CURRENT_USER="${SUDO_USER:-$USER}"
+USER_HOME="$(eval echo ~"$CURRENT_USER")"
+
+echo "Project directory: $PROJECT_DIR"
+echo "User: $CURRENT_USER"
+echo "Home: $USER_HOME"
+echo ""
 
 echo "Step 1: System update"
 echo "---------------------"
@@ -29,7 +36,7 @@ sudo apt update && sudo apt upgrade -y
 echo ""
 echo "Step 2: Install dependencies"
 echo "----------------------------"
-sudo apt install -y git build-essential python3-dev python3-pip python3-pillow
+sudo apt install -y git build-essential python3-dev python3-pip python3-pillow cython3 python3-setuptools
 
 echo ""
 echo "Step 3: Install Node.js 20.x"
@@ -55,15 +62,16 @@ fi
 echo ""
 echo "Step 5: Install rpi-rgb-led-matrix library"
 echo "------------------------------------------"
-if [ ! -d "/home/pi/rpi-rgb-led-matrix" ]; then
-    cd /home/pi
+RGB_MATRIX_DIR="$USER_HOME/rpi-rgb-led-matrix"
+if [ ! -d "$RGB_MATRIX_DIR" ]; then
+    cd "$USER_HOME"
     git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
     cd rpi-rgb-led-matrix
     make
     make build-python PYTHON=$(which python3)
     sudo make install-python PYTHON=$(which python3)
 else
-    echo "rpi-rgb-led-matrix already installed"
+    echo "rpi-rgb-led-matrix already installed at $RGB_MATRIX_DIR"
 fi
 
 echo ""
@@ -90,9 +98,11 @@ echo "========================================"
 echo "Setup complete!"
 echo "========================================"
 echo ""
-echo "Next steps:"
-echo "1. Reboot: sudo reboot"
-echo "2. Test the server: cd ~/subway-sign/server && npm start"
-echo "3. Test the display: sudo python3 ~/subway-sign/display/main.py"
-echo "4. Install services: sudo ~/subway-sign/scripts/install-services.sh"
+echo "IMPORTANT: You must reboot before running the display."
+echo "  sudo reboot"
+echo ""
+echo "After reboot:"
+echo "  1. Test the server: cd $PROJECT_DIR/server && npm start"
+echo "  2. Test the display: sudo python3 $PROJECT_DIR/display/main.py"
+echo "  3. Install services: sudo bash $PROJECT_DIR/scripts/install-services.sh"
 echo ""
