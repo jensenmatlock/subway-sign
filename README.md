@@ -12,7 +12,7 @@ Real-time NYC subway arrival display for Raspberry Pi with RGB LED matrix.
 ├────────────────────────────────────────────────────────────┤
 │  Ⓐ  3m   Ⓒ  8m                                             │ Row 2: A/C trains
 ├────────────────────────────────────────────────────────────┤
-│  ①  2m  5m   ②  9m                                         │ Row 3: 1/2/3 trains
+│  ①  2  5   ②  4  9                                          │ Row 3: 1 local / 2,3 express
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -198,6 +198,29 @@ curl "http://localhost:3000/api/stations?search=penn"
   }
 }
 ```
+
+### Group Lines Together
+
+Merge arrival times from multiple lines into one display entry. Useful for express/local pairs that share a station:
+
+```json
+{
+  "layout": {
+    "row3": {
+      "station": "72_broadway",
+      "lines": ["1", "2", "3"],
+      "groups": [
+        { "lines": ["1"] },
+        { "lines": ["2", "3"] }
+      ],
+      "feed": "123",
+      "label": "1/2/3 Downtown"
+    }
+  }
+}
+```
+
+This shows the 1 train with its own bullet and times, and merges 2/3 express times under a single bullet. Without `groups`, each line gets its own bullet (which may overflow on a 64-pixel display).
 
 ### Adjust Brightness
 
