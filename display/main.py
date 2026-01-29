@@ -88,7 +88,7 @@ class SubwayDisplay:
         project_dir = Path(__file__).parent.parent
         font_dir = project_dir.parent / 'rpi-rgb-led-matrix' / 'fonts'
         self.font = graphics.Font()
-        self.font.LoadFont(str(font_dir / '6x10.bdf'))
+        self.font.LoadFont(str(font_dir / '5x8.bdf'))
 
         # Smaller font for bullet letters
         self.font_small = graphics.Font()
@@ -157,7 +157,7 @@ class SubwayDisplay:
         else:
             text = f"{minutes}m"
 
-        graphics.DrawText(self.canvas, self.font, x, y + 8, white, text)
+        graphics.DrawText(self.canvas, self.font, x, y + 7, white, text)
 
     def _build_display_groups(self, row_key, arrivals):
         """
@@ -213,7 +213,7 @@ class SubwayDisplay:
         if not arrivals:
             # No arrivals - show dashes
             gray = graphics.Color(100, 100, 100)
-            graphics.DrawText(self.canvas, self.font, x, y + 8, gray, "---")
+            graphics.DrawText(self.canvas, self.font, x, y + 7, gray, "---")
             return
 
         display_groups = self._build_display_groups(row_key, arrivals)
@@ -234,10 +234,10 @@ class SubwayDisplay:
                 else:
                     time_text = f"{mins}"
 
-                graphics.DrawText(self.canvas, self.font, x, y + 8, white, time_text)
-                x += len(time_text) * 6 + 4  # 6px per char + 4px spacing
+                graphics.DrawText(self.canvas, self.font, x, y + 7, white, time_text)
+                x += len(time_text) * 5 + 3  # 5px per char + 3px spacing
 
-            x += 3  # Space before next group
+            x += 1  # Space before next group
 
     def draw_error(self, message):
         """Display an error message."""
@@ -246,7 +246,7 @@ class SubwayDisplay:
             return
 
         red = graphics.Color(255, 0, 0)
-        graphics.DrawText(self.canvas, self.font, 2, 18, red, message[:10])
+        graphics.DrawText(self.canvas, self.font, 2, 17, red, message[:12])
 
     def update(self, data):
         """Update the display with new arrival data."""
