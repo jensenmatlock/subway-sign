@@ -35,6 +35,10 @@
     "row3": {
       "station": "72_broadway",
       "lines": ["1", "2", "3"],
+      "groups": [
+        { "lines": ["1"] },
+        { "lines": ["2", "3"] }
+      ],
       "feed": "123",
       "label": "1/2/3 Downtown"
     }

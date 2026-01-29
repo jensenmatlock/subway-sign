@@ -159,6 +159,40 @@ class SubwayDisplay:
 
         graphics.DrawText(self.canvas, self.font, x, y + 8, white, text)
 
+    def _build_display_groups(self, row_key, arrivals):
+        """
+        Build display groups from arrivals.
+        If the row has a 'groups' config, merge lines per group.
+        Otherwise, group by individual route (default behavior).
+        Returns list of (bullet_line, sorted_times) tuples.
+        """
+        layout = CONFIG.get('layout', {}).get(row_key, {})
+        groups_config = layout.get('groups')
+
+        # Index arrivals by route
+        by_route = {}
+        for arrival in arrivals:
+            route = arrival['route']
+            if route not in by_route:
+                by_route[route] = []
+            by_route[route].append(arrival['minutesUntil'])
+
+        if groups_config:
+            # Merge lines per configured group
+            display_groups = []
+            for group in groups_config:
+                group_lines = group['lines']
+                merged_times = []
+                for line in group_lines:
+                    merged_times.extend(by_route.get(line, []))
+                if merged_times:
+                    merged_times.sort()
+                    display_groups.append((group_lines[0], merged_times))
+            return display_groups
+        else:
+            # Default: one group per route
+            return list(by_route.items())
+
     def draw_row(self, row_key, arrivals):
         """
         Draw a single row of arrivals.
@@ -182,23 +216,17 @@ class SubwayDisplay:
             graphics.DrawText(self.canvas, self.font, x, y + 8, gray, "---")
             return
 
-        # Group arrivals by route
-        by_route = {}
-        for arrival in arrivals:
-            route = arrival['route']
-            if route not in by_route:
-                by_route[route] = []
-            by_route[route].append(arrival['minutesUntil'])
+        display_groups = self._build_display_groups(row_key, arrivals)
 
-        # Draw each route's bullet and times
-        for route, times in by_route.items():
+        # Draw each group's bullet and times
+        for route, times in display_groups:
             if x > 50:  # Don't overflow the display
                 break
 
             # Draw the line bullet
             x += self.draw_line_bullet(x, y, route)
 
-            # Draw up to 2 arrival times for this route
+            # Draw up to 2 arrival times for this group
             white = graphics.Color(200, 200, 200)
             for i, mins in enumerate(times[:2]):
                 if mins < 1:
@@ -207,9 +235,9 @@ class SubwayDisplay:
                     time_text = f"{mins}"
 
                 graphics.DrawText(self.canvas, self.font, x, y + 8, white, time_text)
-                x += len(time_text) * 6 + 1  # 6px per char + spacing
+                x += len(time_text) * 6 + 4  # 6px per char + 4px spacing
 
-            x += 3  # Space before next route
+            x += 3  # Space before next group
 
     def draw_error(self, message):
         """Display an error message."""
