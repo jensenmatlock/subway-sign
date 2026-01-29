@@ -84,7 +84,9 @@ class SubwayDisplay:
         self.canvas = self.matrix.CreateFrameCanvas()
 
         # Load fonts from rpi-rgb-led-matrix fonts directory
-        font_dir = Path.home() / 'rpi-rgb-led-matrix' / 'fonts'
+        # Use project parent dir (not home dir, since service runs as root)
+        project_dir = Path(__file__).parent.parent
+        font_dir = project_dir.parent / 'rpi-rgb-led-matrix' / 'fonts'
         self.font = graphics.Font()
         self.font.LoadFont(str(font_dir / '5x7.bdf'))
 
