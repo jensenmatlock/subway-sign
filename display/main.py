@@ -49,12 +49,12 @@ LINE_COLORS = {
     'S': (128, 128, 128),
 }
 
-# Row Y positions for 32-pixel height display (3 rows, tight spacing)
-# Each row is 7px tall with 2px gaps: 0-6, 9-15, 18-24
+# Row Y positions for 32-pixel height display (3 rows filling full height)
+# Each row is 10px tall with 1px gaps: 0-9, 11-20, 22-31
 ROW_POSITIONS = {
     'row1': 0,
-    'row2': 9,
-    'row3': 18,
+    'row2': 11,
+    'row3': 22,
 }
 
 
@@ -88,40 +88,42 @@ class SubwayDisplay:
         project_dir = Path(__file__).parent.parent
         font_dir = project_dir.parent / 'rpi-rgb-led-matrix' / 'fonts'
         self.font = graphics.Font()
-        self.font.LoadFont(str(font_dir / '5x7.bdf'))
+        self.font.LoadFont(str(font_dir / '6x10.bdf'))
 
-        # Smaller font for "min" text if available
+        # Smaller font for bullet letters
         self.font_small = graphics.Font()
         try:
-            self.font_small.LoadFont(str(font_dir / '4x6.bdf'))
+            self.font_small.LoadFont(str(font_dir / '5x7.bdf'))
         except:
             self.font_small = self.font
 
     def draw_line_bullet(self, x, y, line):
         """
         Draw a colored circle with the line letter.
-        The bullet is 7x7 pixels centered at (x+3, y+3).
+        The bullet is 9x9 pixels.
         """
         if not HAS_MATRIX:
-            return 8  # Return width for simulation
+            return 10  # Return width for simulation
 
         color = LINE_COLORS.get(line, (255, 255, 255))
 
         # Draw filled circle (approximated with horizontal lines)
-        # Circle pattern for 7x7:
-        #   ..XXX..  (row 0: 3 pixels)
-        #   .XXXXX.  (row 1: 5 pixels)
-        #   XXXXXXX  (row 2-4: 7 pixels)
-        #   .XXXXX.  (row 5: 5 pixels)
-        #   ..XXX..  (row 6: 3 pixels)
+        # Circle pattern for 9x9:
+        #   ..XXXXX..  (row 0: 5 pixels)
+        #   .XXXXXXX.  (row 1: 7 pixels)
+        #   XXXXXXXXX  (row 2-6: 9 pixels)
+        #   .XXXXXXX.  (row 7: 7 pixels)
+        #   ..XXXXX..  (row 8: 5 pixels)
         circle_pattern = [
-            (2, 3),   # row 0: start at x+2, width 3
-            (1, 5),   # row 1: start at x+1, width 5
-            (0, 7),   # row 2: full width
-            (0, 7),   # row 3: full width
-            (0, 7),   # row 4: full width
-            (1, 5),   # row 5
-            (2, 3),   # row 6
+            (2, 5),   # row 0
+            (1, 7),   # row 1
+            (0, 9),   # row 2
+            (0, 9),   # row 3
+            (0, 9),   # row 4
+            (0, 9),   # row 5
+            (0, 9),   # row 6
+            (1, 7),   # row 7
+            (2, 5),   # row 8
         ]
 
         for row_offset, (start, width) in enumerate(circle_pattern):
@@ -136,10 +138,10 @@ class SubwayDisplay:
         else:
             text_color = graphics.Color(255, 255, 255)
 
-        # Center the letter in the bullet (font is 5 wide, bullet is 7)
-        graphics.DrawText(self.canvas, self.font, x + 1, y + 6, text_color, line)
+        # Center the 5x7 letter in the 9x9 bullet
+        graphics.DrawText(self.canvas, self.font_small, x + 2, y + 7, text_color, line)
 
-        return 8  # Bullet width + 1px spacing
+        return 10  # Bullet width + 1px spacing
 
     def draw_time(self, x, y, minutes):
         """Draw arrival time in minutes."""
@@ -155,7 +157,7 @@ class SubwayDisplay:
         else:
             text = f"{minutes}m"
 
-        graphics.DrawText(self.canvas, self.font, x, y + 6, white, text)
+        graphics.DrawText(self.canvas, self.font, x, y + 8, white, text)
 
     def draw_row(self, row_key, arrivals):
         """
@@ -177,7 +179,7 @@ class SubwayDisplay:
         if not arrivals:
             # No arrivals - show dashes
             gray = graphics.Color(100, 100, 100)
-            graphics.DrawText(self.canvas, self.font, x, y + 6, gray, "---")
+            graphics.DrawText(self.canvas, self.font, x, y + 8, gray, "---")
             return
 
         # Group arrivals by route
@@ -204,8 +206,8 @@ class SubwayDisplay:
                 else:
                     time_text = f"{mins}"
 
-                graphics.DrawText(self.canvas, self.font, x, y + 6, white, time_text)
-                x += len(time_text) * 5 + 1  # 5px per char + spacing
+                graphics.DrawText(self.canvas, self.font, x, y + 8, white, time_text)
+                x += len(time_text) * 6 + 1  # 6px per char + spacing
 
             x += 3  # Space before next route
 
@@ -216,7 +218,7 @@ class SubwayDisplay:
             return
 
         red = graphics.Color(255, 0, 0)
-        graphics.DrawText(self.canvas, self.font, 2, 16, red, message[:12])
+        graphics.DrawText(self.canvas, self.font, 2, 18, red, message[:10])
 
     def update(self, data):
         """Update the display with new arrival data."""
