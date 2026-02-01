@@ -150,12 +150,7 @@ class SubwayDisplay:
 
         white = graphics.Color(200, 200, 200)
 
-        if minutes < 1:
-            text = "Now"
-        elif minutes == 1:
-            text = "1m"
-        else:
-            text = f"{minutes}m"
+        text = f"{max(minutes, 0)}"
 
         graphics.DrawText(self.canvas, self.font, x, y + 7, white, text)
 
@@ -229,10 +224,7 @@ class SubwayDisplay:
             # Draw up to 2 arrival times for this group
             white = graphics.Color(200, 200, 200)
             for i, mins in enumerate(times[:2]):
-                if mins < 1:
-                    time_text = "Now"
-                else:
-                    time_text = f"{mins}"
+                time_text = f"{max(mins, 0)}"
 
                 graphics.DrawText(self.canvas, self.font, x, y + 7, white, time_text)
                 x += len(time_text) * 5 + 3  # 5px per char + 3px spacing
