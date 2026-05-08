@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { fetchAllFeeds } from '../lib/gtfs-fetcher.js';
 import { getArrivalsForStop, formatArrivalsForDisplay } from '../lib/arrival-parser.js';
 import { findStopsByName, getStopName } from '../lib/station-lookup.js';
+import { getWeather } from '../lib/weather.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(
@@ -66,6 +67,10 @@ router.get('/arrivals', async (req, res) => {
         lines: rowConfig.lines,
         arrivals: formatArrivalsForDisplay(arrivals, 2, 4)
       };
+    }
+
+    if (config.weather?.enabled) {
+      result.weather = await getWeather(config.weather.lat, config.weather.lon);
     }
 
     res.json(result);

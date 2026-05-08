@@ -56,5 +56,10 @@
     "enabled": true,
     "weekday": { "on": "06:30", "off": "21:00" },
     "weekend": { "on": "09:00", "off": "22:00" }
+  },
+  "weather": {
+    "enabled": true,
+    "lat": 40.7785,
+    "lon": -73.9821
   }
 }

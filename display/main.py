@@ -77,6 +77,11 @@ ROW_POSITIONS = {
     'row3': 22,
 }
 
+# Weather render colors. Cyan/teal is distinct from the white arrival times
+# and from every MTA line bullet color.
+WEATHER_COLOR = (80, 220, 220)
+RAIN_COLOR = (80, 140, 220)
+
 
 class SubwayDisplay:
     """Manages the LED matrix display for subway arrivals."""
@@ -251,6 +256,43 @@ class SubwayDisplay:
 
             x += 1  # Space before next group
 
+    def _draw_droplet(self, x, y, rgb):
+        """Draw a 5x5 water-drop glyph anchored at (x, y)."""
+        pattern = [
+            "..#..",
+            ".###.",
+            ".###.",
+            "#####",
+            ".###.",
+        ]
+        for dy, row in enumerate(pattern):
+            for dx, ch in enumerate(row):
+                if ch == '#':
+                    self.canvas.SetPixel(x + dx, y + dy, *rgb)
+
+    def draw_weather(self, weather):
+        """Draw temperature + optional rain glyph at the top-right of row 1."""
+        if not weather or weather.get('temperature') is None:
+            return
+
+        if not HAS_MATRIX:
+            unit = weather.get('unit', 'F')
+            rain = weather.get('rain')
+            stale = weather.get('stale', False)
+            print(f"  weather: {weather['temperature']}°{unit} rain={rain} stale={stale}", flush=True)
+            return
+
+        text = f"{weather['temperature']}°"
+        # 5x8 font: each glyph is 5 px wide with 1 px advance, so n chars = 6n-1 px.
+        text_width = len(text) * 6 - 1
+        x = 64 - text_width
+
+        weather_color = graphics.Color(*WEATHER_COLOR)
+        graphics.DrawText(self.canvas, self.font, x, 7, weather_color, text)
+
+        if weather.get('rain'):
+            self._draw_droplet(x - 7, 2, RAIN_COLOR)
+
     def draw_error(self, message):
         """Display an error message."""
         if not HAS_MATRIX:
@@ -276,6 +318,8 @@ class SubwayDisplay:
             row_data = data['rows'].get(row_key, {})
             arrivals = row_data.get('arrivals', [])
             self.draw_row(row_key, arrivals)
+
+        self.draw_weather(data.get('weather'))
 
         if HAS_MATRIX:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)

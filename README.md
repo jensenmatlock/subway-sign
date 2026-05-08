@@ -267,6 +267,22 @@ Blank the display outside configured hours so it isn't distracting at night. Tim
 
 The server keeps polling MTA during off-hours, so the first frame after wake-up is current. Set `"enabled": false` to disable scheduling and keep the display on continuously.
 
+### Weather
+
+Top-right of row 1 shows the current temperature and a small droplet glyph when rain is likely in the next hour. Data comes from the National Weather Service (`api.weather.gov`) — no API key, US-only, 10-minute server-side cache.
+
+```json
+{
+  "weather": {
+    "enabled": true,
+    "lat": 40.7785,
+    "lon": -73.9821
+  }
+}
+```
+
+If NWS is unreachable the display falls back to the last known reading. Set `"enabled": false` to skip weather entirely.
+
 ### Adjust Brightness
 
 ```json
