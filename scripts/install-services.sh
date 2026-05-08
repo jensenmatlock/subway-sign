@@ -66,6 +66,35 @@ ExecStartPre=/bin/sleep 5
 WantedBy=multi-user.target
 EOF
 
+cat > /etc/systemd/system/subway-deploy.service <<EOF
+[Unit]
+Description=NYC Subway Sign Auto-Deploy (git pull + restart)
+Documentation=https://github.com/jensenmatlock/subway-sign
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Run as root so we can restart subway-server / subway-display.
+# git operates on $PROJECT_DIR via safe.directory inside deploy.sh.
+ExecStart=/bin/bash $PROJECT_DIR/scripts/deploy.sh
+StandardOutput=journal
+StandardError=journal
+EOF
+
+cat > /etc/systemd/system/subway-deploy.timer <<EOF
+[Unit]
+Description=Run NYC Subway Sign Auto-Deploy every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=subway-deploy.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
 # Reload systemd
 echo "Reloading systemd..."
 sudo systemctl daemon-reload
@@ -74,14 +103,18 @@ sudo systemctl daemon-reload
 echo "Enabling services..."
 sudo systemctl enable subway-server
 sudo systemctl enable subway-display
+sudo systemctl enable subway-deploy.timer
 
 echo ""
 echo "Services installed successfully!"
 echo ""
 echo "Commands:"
 echo "  sudo systemctl start subway-server subway-display  # Start both services"
+echo "  sudo systemctl start subway-deploy.timer           # Start auto-deploy timer"
 echo "  sudo systemctl stop subway-server subway-display   # Stop both services"
 echo "  sudo systemctl status subway-server                # Check server status"
 echo "  sudo systemctl status subway-display               # Check display status"
+echo "  sudo systemctl list-timers subway-deploy.timer     # When auto-deploy will run next"
 echo "  sudo journalctl -u subway-server -f                # View server logs"
 echo "  sudo journalctl -u subway-display -f               # View display logs"
+echo "  sudo journalctl -u subway-deploy -f                # View auto-deploy logs"

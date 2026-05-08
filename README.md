@@ -132,11 +132,12 @@ After reboot:
 cd ~/subway-sign
 sudo bash scripts/install-services.sh
 
-# Start the services
+# Start the services (and the auto-deploy timer)
 sudo systemctl start subway-server subway-display
+sudo systemctl start subway-deploy.timer
 ```
 
-The sign will now auto-start on boot.
+The sign will now auto-start on boot, and the Pi will pull updates from GitHub every 5 minutes (see [Auto-Deploy](#auto-deploy)).
 
 ### 4. Verify It's Working
 
@@ -152,6 +153,34 @@ sudo journalctl -u subway-display -f
 # Test API
 curl http://localhost:3000/api/arrivals
 ```
+
+## Auto-Deploy
+
+A systemd timer (`subway-deploy.timer`) runs `scripts/deploy.sh` every 5 minutes. The script:
+
+1. `git fetch` and compare local vs `origin/<branch>`. Exit immediately if up to date.
+2. Fast-forward `git pull` (refuses if local has diverged — protects hand-edits).
+3. Run `npm install` if `server/package*.json` changed.
+4. Run `pip install` if `display/requirements.txt` changed.
+5. `systemctl restart subway-server subway-display` if any code or `config.json` changed. README-only updates don't trigger a restart.
+
+Push to GitHub and within ~5 minutes the Pi reflects the change.
+
+```bash
+# View deploy history
+sudo journalctl -u subway-deploy -n 50
+
+# See when the next deploy will run
+sudo systemctl list-timers subway-deploy.timer
+
+# Trigger a deploy immediately
+sudo systemctl start subway-deploy.service
+
+# Disable auto-deploy
+sudo systemctl disable --now subway-deploy.timer
+```
+
+If you edit files directly on the Pi, the next deploy will fail with a non-fast-forward error (intentional — local edits are preserved). Either commit and push them, or `git reset --hard origin/<branch>` to discard them.
 
 ## Configuration
 
