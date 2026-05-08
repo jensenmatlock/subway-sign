@@ -222,6 +222,22 @@ Merge arrival times from multiple lines into one display entry. Useful for expre
 
 This shows the 1 train with its own bullet and times, and merges 2/3 express times under a single bullet. Without `groups`, each line gets its own bullet (which may overflow on a 64-pixel display).
 
+### Schedule On/Off
+
+Blank the display outside configured hours so it isn't distracting at night. Times are local Pi time (set timezone to `America/New_York` in the imager).
+
+```json
+{
+  "schedule": {
+    "enabled": true,
+    "weekday": { "on": "06:30", "off": "21:00" },
+    "weekend": { "on": "09:00", "off": "22:00" }
+  }
+}
+```
+
+The server keeps polling MTA during off-hours, so the first frame after wake-up is current. Set `"enabled": false` to disable scheduling and keep the display on continuously.
+
 ### Adjust Brightness
 
 ```json

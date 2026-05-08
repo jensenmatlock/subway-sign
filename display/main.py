@@ -10,6 +10,7 @@ import json
 import time
 import requests
 import sys
+from datetime import datetime, time as dtime
 from pathlib import Path
 
 # Only import RGB matrix on Raspberry Pi
@@ -24,6 +25,25 @@ except ImportError:
 CONFIG_PATH = Path(__file__).parent.parent / 'config.json'
 with open(CONFIG_PATH) as f:
     CONFIG = json.load(f)
+
+def _parse_hhmm(s):
+    h, m = s.split(":")
+    return dtime(int(h), int(m))
+
+
+def is_display_on(now, schedule):
+    """Return True if the display should be drawing at `now` (a datetime).
+
+    Assumes `on < off` within a single day for each window.
+    """
+    if not schedule or not schedule.get("enabled", True):
+        return True
+    is_weekday = now.weekday() < 5
+    window = schedule["weekday" if is_weekday else "weekend"]
+    on_t = _parse_hhmm(window["on"])
+    off_t = _parse_hhmm(window["off"])
+    return on_t <= now.time() < off_t
+
 
 # Official MTA line colors (RGB)
 LINE_COLORS = {
@@ -306,6 +326,14 @@ def main():
 
     try:
         while True:
+            if not is_display_on(datetime.now(), CONFIG.get("schedule")):
+                if HAS_MATRIX:
+                    display.clear()
+                else:
+                    print(f"[{time.strftime('%H:%M:%S')}] off-hours - display blanked", flush=True)
+                time.sleep(refresh_seconds)
+                continue
+
             data = fetch_arrivals()
 
             if data:
