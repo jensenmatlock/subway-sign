@@ -9,8 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-# Allow root to operate on the user-owned repo without git's "dubious ownership" warning.
-git config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
+# Allow root to operate on the user-owned repo. We use git's env-var config
+# rather than `git config --global` because systemd doesn't set HOME, and the
+# global write would silently fail (then git's dubious-ownership check trips).
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=safe.directory
+export GIT_CONFIG_VALUE_0="$PROJECT_DIR"
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 git fetch --quiet origin "$BRANCH"
