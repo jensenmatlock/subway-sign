@@ -91,9 +91,36 @@ class SubwayDisplay:
         self.canvas = None
         self.font = None
         self.font_small = None
+        self._last_state_key = None
 
         if HAS_MATRIX:
             self._init_matrix()
+
+    @staticmethod
+    def _compute_state_key(data, draw_arrivals):
+        """Build a comparable key representing what would be drawn.
+
+        Skips a redraw when this key matches the previous frame so the
+        matrix doesn't flicker on no-op refresh cycles.
+        """
+        weather = (data or {}).get('weather') or {}
+        weather_part = (weather.get('temperature'), weather.get('rain'))
+
+        if not draw_arrivals:
+            return ('weather-only', weather_part)
+
+        if not data or 'rows' not in data:
+            return ('no-data', weather_part)
+
+        rows = data['rows']
+        rows_part = tuple(
+            tuple(
+                (a.get('route'), a.get('minutesUntil'))
+                for a in rows.get(rk, {}).get('arrivals', [])
+            )
+            for rk in ('row1', 'row2', 'row3')
+        )
+        return ('rows', rows_part, weather_part)
 
     def _init_matrix(self):
         """Initialize the RGB LED matrix."""
@@ -307,7 +334,13 @@ class SubwayDisplay:
 
         draw_arrivals=False blanks the train rows but still renders weather —
         used during off-schedule hours so the temperature stays visible.
+        Skips the redraw entirely when the rendered state would be unchanged.
         """
+        state_key = self._compute_state_key(data, draw_arrivals)
+        if HAS_MATRIX and state_key == self._last_state_key:
+            return
+        self._last_state_key = state_key
+
         if HAS_MATRIX:
             self.canvas.Clear()
 
