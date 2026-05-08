@@ -302,24 +302,27 @@ class SubwayDisplay:
         red = graphics.Color(255, 0, 0)
         graphics.DrawText(self.canvas, self.font, 2, 17, red, message[:12])
 
-    def update(self, data):
-        """Update the display with new arrival data."""
+    def update(self, data, draw_arrivals=True):
+        """Update the display.
+
+        draw_arrivals=False blanks the train rows but still renders weather —
+        used during off-schedule hours so the temperature stays visible.
+        """
         if HAS_MATRIX:
             self.canvas.Clear()
 
-        if not data or 'rows' not in data:
-            self.draw_error("NO DATA")
-            if HAS_MATRIX:
-                self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            return
+        weather = (data or {}).get('weather')
 
-        # Draw each row
-        for row_key in ['row1', 'row2', 'row3']:
-            row_data = data['rows'].get(row_key, {})
-            arrivals = row_data.get('arrivals', [])
-            self.draw_row(row_key, arrivals)
+        if draw_arrivals:
+            if data and 'rows' in data:
+                for row_key in ['row1', 'row2', 'row3']:
+                    row_data = data['rows'].get(row_key, {})
+                    arrivals = row_data.get('arrivals', [])
+                    self.draw_row(row_key, arrivals)
+            else:
+                self.draw_error("NO DATA")
 
-        self.draw_weather(data.get('weather'))
+        self.draw_weather(weather)
 
         if HAS_MATRIX:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
@@ -370,23 +373,17 @@ def main():
 
     try:
         while True:
-            if not is_display_on(datetime.now(), CONFIG.get("schedule")):
-                if HAS_MATRIX:
-                    display.clear()
-                else:
-                    print(f"[{time.strftime('%H:%M:%S')}] off-hours - display blanked", flush=True)
-                time.sleep(refresh_seconds)
-                continue
-
+            schedule_on = is_display_on(datetime.now(), CONFIG.get("schedule"))
             data = fetch_arrivals()
 
-            if data:
-                print(f"[{time.strftime('%H:%M:%S')}] Updated arrivals:", flush=True)
-                display.update(data)
-                sys.stdout.flush()
+            ts = time.strftime('%H:%M:%S')
+            if schedule_on:
+                print(f"[{ts}] Updated arrivals:", flush=True)
             else:
-                display.draw_error("NO DATA")
+                print(f"[{ts}] off-hours - weather only", flush=True)
 
+            display.update(data, draw_arrivals=schedule_on)
+            sys.stdout.flush()
             time.sleep(refresh_seconds)
 
     except KeyboardInterrupt:
