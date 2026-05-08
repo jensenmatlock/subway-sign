@@ -22,3 +22,6 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Private operational notes
+OPERATIONS.md
