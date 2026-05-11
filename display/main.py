@@ -31,14 +31,25 @@ def _parse_hhmm(s):
     return dtime(int(h), int(m))
 
 
+NIGHT_CUTOVER = dtime(20, 0)
+
+
 def is_display_on(now, schedule):
     """Return True if the display should be drawing at `now` (a datetime).
 
-    Assumes `on < off` within a single day for each window.
+    Friday night (>= 20:00) is treated as weekend; Sunday night (>= 20:00) is
+    treated as weekday. Assumes `on < off` within a single day for each window.
     """
     if not schedule or not schedule.get("enabled", True):
         return True
-    is_weekday = now.weekday() < 5
+    dow = now.weekday()
+    after_cutover = now.time() >= NIGHT_CUTOVER
+    if dow == 4 and after_cutover:  # Friday night → weekend
+        is_weekday = False
+    elif dow == 6 and after_cutover:  # Sunday night → weekday
+        is_weekday = True
+    else:
+        is_weekday = dow < 5
     window = schedule["weekday" if is_weekday else "weekend"]
     on_t = _parse_hhmm(window["on"])
     off_t = _parse_hhmm(window["off"])
