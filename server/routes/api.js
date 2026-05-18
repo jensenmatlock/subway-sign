@@ -70,7 +70,12 @@ router.get('/arrivals', async (req, res) => {
     }
 
     if (config.weather?.enabled) {
-      result.weather = await getWeather(config.weather.lat, config.weather.lon);
+      try {
+        result.weather = await getWeather(config.weather.lat, config.weather.lon);
+      } catch (weatherError) {
+        console.error('Weather fetch failed:', weatherError);
+        result.weather = null;
+      }
     }
 
     res.json(result);

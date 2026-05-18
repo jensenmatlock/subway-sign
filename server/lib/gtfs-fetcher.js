@@ -5,8 +5,10 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
  * @param {string} url - The MTA feed URL
  * @returns {Promise<Object>} Decoded protobuf feed message
  */
+const FEED_TIMEOUT_MS = 8000;
+
 export async function fetchFeed(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error(`Feed fetch failed: ${response.status} ${response.statusText}`);
