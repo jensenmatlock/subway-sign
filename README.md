@@ -253,7 +253,7 @@ This shows the 1 train with its own bullet and times, and merges 2/3 express tim
 
 ### Schedule On/Off
 
-Blank train arrivals outside configured hours so the display isn't distracting at night. The weather indicator (top-right) stays on continuously — it's lower-luminance and updates infrequently. Times are local Pi time (set timezone to `America/New_York` in the imager).
+Blank train arrivals outside configured hours so the display isn't distracting at night. The weather indicator (top-right) stays on continuously, but dims to a muted glow during off-schedule hours so it's unobtrusive at night. Times are local Pi time (set timezone to `America/New_York` in the imager).
 
 ```json
 {

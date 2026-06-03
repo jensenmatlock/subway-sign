@@ -93,6 +93,15 @@ ROW_POSITIONS = {
 WEATHER_COLOR = (80, 220, 220)
 RAIN_COLOR = (80, 140, 220)
 
+# Brightness multiplier applied to the weather glyphs during off-schedule hours,
+# when the train rows are blanked. Keeps the temperature legible but visibly muted.
+WEATHER_DIM_FACTOR = 0.4
+
+
+def _dim_color(rgb, factor):
+    """Scale an (r, g, b) tuple by `factor`, clamping to the 0-255 range."""
+    return tuple(max(0, min(255, int(c * factor))) for c in rgb)
+
 
 class SubwayDisplay:
     """Manages the LED matrix display for subway arrivals."""
@@ -308,8 +317,12 @@ class SubwayDisplay:
                 if ch == '#':
                     self.canvas.SetPixel(x + dx, y + dy, *rgb)
 
-    def draw_weather(self, weather):
-        """Draw temperature + optional rain glyph at the top-right of row 1."""
+    def draw_weather(self, weather, dim=False):
+        """Draw temperature + optional rain glyph at the top-right of row 1.
+
+        `dim` mutes the glyph colors for off-schedule hours, when the train
+        rows are blanked but the weather stays on.
+        """
         if not weather or weather.get('temperature') is None:
             return
 
@@ -317,7 +330,7 @@ class SubwayDisplay:
             unit = weather.get('unit', 'F')
             rain = weather.get('rain')
             stale = weather.get('stale', False)
-            print(f"  weather: {weather['temperature']}°{unit} rain={rain} stale={stale}", flush=True)
+            print(f"  weather: {weather['temperature']}°{unit} rain={rain} stale={stale} dim={dim}", flush=True)
             return
 
         text = f"{weather['temperature']}°"
@@ -325,11 +338,17 @@ class SubwayDisplay:
         text_width = len(text) * 6 - 1
         x = 64 - text_width
 
-        weather_color = graphics.Color(*WEATHER_COLOR)
+        weather_rgb = WEATHER_COLOR
+        rain_rgb = RAIN_COLOR
+        if dim:
+            weather_rgb = _dim_color(weather_rgb, WEATHER_DIM_FACTOR)
+            rain_rgb = _dim_color(rain_rgb, WEATHER_DIM_FACTOR)
+
+        weather_color = graphics.Color(*weather_rgb)
         graphics.DrawText(self.canvas, self.font, x, 7, weather_color, text)
 
         if weather.get('rain'):
-            self._draw_droplet(x - 7, 2, RAIN_COLOR)
+            self._draw_droplet(x - 7, 2, rain_rgb)
 
     def draw_error(self, message):
         """Display an error message."""
@@ -366,7 +385,7 @@ class SubwayDisplay:
             else:
                 self.draw_error("NO DATA")
 
-        self.draw_weather(weather)
+        self.draw_weather(weather, dim=not draw_arrivals)
 
         if HAS_MATRIX:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
