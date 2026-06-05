@@ -49,14 +49,30 @@ else
 fi
 
 echo ""
-echo "Step 4: Disable onboard audio (conflicts with LED matrix)"
-echo "---------------------------------------------------------"
+echo "Step 4: Configure boot for LED matrix (disable audio + isolate CPU core)"
+echo "-----------------------------------------------------------------------"
+# Onboard audio shares the GPIO/PWM the matrix needs - blacklist it.
 if ! grep -q "blacklist snd_bcm2835" /etc/modprobe.d/blacklist-rgb-matrix.conf 2>/dev/null; then
     echo "blacklist snd_bcm2835" | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
     sudo update-initramfs -u
     echo "Audio disabled - will take effect after reboot"
 else
     echo "Audio already disabled"
+fi
+
+# Reserve CPU core 3 for the matrix refresh thread. Without this the kernel
+# scheduler preempts the refresh thread on a shared core, causing visible
+# flicker (rpi-rgb-led-matrix recommends isolcpus). Boot partition may be
+# mounted read-only, so remount rw to edit. Takes effect after reboot.
+CMDLINE=/boot/firmware/cmdline.txt
+[ -f "$CMDLINE" ] || CMDLINE=/boot/cmdline.txt
+if [ -f "$CMDLINE" ] && ! grep -q "isolcpus=" "$CMDLINE"; then
+    sudo mount -o remount,rw "$(dirname "$CMDLINE")" 2>/dev/null || true
+    sudo sed -i 's/[[:space:]]*$/ isolcpus=3/' "$CMDLINE"
+    sync
+    echo "Isolated CPU core 3 for the matrix - will take effect after reboot"
+else
+    echo "CPU core isolation already configured (or cmdline.txt not found)"
 fi
 
 echo ""
