@@ -331,6 +331,19 @@ pip install -r requirements.txt
 python main.py  # Prints to console instead of LED matrix
 ```
 
+### Run tests
+```bash
+# Server (Node's built-in test runner, no extra deps)
+cd server
+npm test
+
+# Display (Python unittest, no Pi required)
+cd display
+python test_resilience.py
+python test_schedule.py
+python test_weather.py
+```
+
 ## License
 
 MIT

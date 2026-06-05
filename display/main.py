@@ -56,6 +56,29 @@ def is_display_on(now, schedule):
     return on_t <= now.time() < off_t
 
 
+# How many consecutive failed fetches we'll paper over by re-showing the last
+# good frame before giving up and drawing NO DATA. A failed cycle costs up to
+# (request timeout + refresh interval), so 3 ≈ 90-135s of last-good before blank.
+MAX_CONSECUTIVE_FAILURES = 3
+
+
+def choose_render_data(fetched, last_good, failures, max_failures):
+    """Decide what to draw when a fetch may have failed.
+
+    A single slow/failed poll shouldn't blank a working display, so we keep
+    showing the last good frame for up to `max_failures` consecutive failures,
+    then fall back to None (NO DATA) if the outage persists.
+
+    Returns (data_to_render, new_last_good, new_failures).
+    """
+    if fetched is not None:
+        return fetched, fetched, 0
+    failures += 1
+    if last_good is not None and failures <= max_failures:
+        return last_good, last_good, failures
+    return None, last_good, failures
+
+
 # Official MTA line colors (RGB)
 LINE_COLORS = {
     # 8th Ave (blue)
@@ -405,7 +428,7 @@ def fetch_arrivals(port=None):
     try:
         response = requests.get(
             f"http://localhost:{port}/api/arrivals",
-            timeout=10
+            timeout=15
         )
         response.raise_for_status()
         return response.json()
@@ -434,16 +457,26 @@ def main():
 
     print("\nStarting display loop. Press Ctrl+C to exit.\n", flush=True)
 
+    last_good = None
+    failures = 0
+
     try:
         while True:
             schedule_on = is_display_on(datetime.now(), CONFIG.get("schedule"))
-            data = fetch_arrivals()
+            fetched = fetch_arrivals()
+            data, last_good, failures = choose_render_data(
+                fetched, last_good, failures, MAX_CONSECUTIVE_FAILURES
+            )
 
             ts = time.strftime('%H:%M:%S')
-            if schedule_on:
-                print(f"[{ts}] Updated arrivals:", flush=True)
-            else:
+            if not schedule_on:
                 print(f"[{ts}] off-hours - weather only", flush=True)
+            elif fetched is None and data is not None:
+                print(f"[{ts}] fetch failed - showing last good (failure {failures})", flush=True)
+            elif fetched is None:
+                print(f"[{ts}] fetch failed - no data ({failures} consecutive)", flush=True)
+            else:
+                print(f"[{ts}] Updated arrivals:", flush=True)
 
             display.update(data, draw_arrivals=schedule_on)
             sys.stdout.flush()

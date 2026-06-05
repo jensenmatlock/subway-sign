@@ -22,10 +22,18 @@ export async function fetchFeed(url) {
   return feed;
 }
 
+// Last successfully decoded feed per name. On a transient fetch failure we serve
+// the previous feed instead of null so the row keeps its arrivals rather than
+// dropping to "---". No age cap is needed: getArrivalsForStop filters out
+// arrivals whose arrivalTime is in the past, so a stale feed's row self-empties
+// within the normal arrival horizon if the feed stays down.
+const lastGoodFeeds = {};
+
 /**
  * Fetch multiple GTFS-RT feeds in parallel
  * @param {Object} feedUrls - Object mapping feed names to URLs
- * @returns {Promise<Object>} Object mapping feed names to decoded feeds (or null on error)
+ * @returns {Promise<Object>} Object mapping feed names to decoded feeds. On
+ *   failure, falls back to the last good feed for that name, or null if none.
  */
 export async function fetchAllFeeds(feedUrls) {
   const entries = Object.entries(feedUrls);
@@ -33,10 +41,11 @@ export async function fetchAllFeeds(feedUrls) {
     entries.map(async ([name, url]) => {
       try {
         const feed = await fetchFeed(url);
+        lastGoodFeeds[name] = feed;
         return [name, feed];
       } catch (error) {
         console.error(`Error fetching ${name} feed:`, error.message);
-        return [name, null];
+        return [name, lastGoodFeeds[name] ?? null];
       }
     })
   );

@@ -14,9 +14,11 @@ const config = JSON.parse(
 
 const router = Router();
 
-// Feed cache with TTL
+// Feed cache with TTL. Aligned to the display's poll interval so consecutive
+// sub-interval requests share one fetch (resilience to failed fetches is handled
+// by the per-feed last-good cache in gtfs-fetcher, not by this TTL).
 let feedCache = { data: null, timestamp: 0 };
-const CACHE_TTL = 15000; // 15 seconds
+const CACHE_TTL = config.server.refreshInterval;
 
 /**
  * Get cached feeds or fetch fresh data
@@ -39,7 +41,15 @@ async function getCachedFeeds() {
  */
 router.get('/arrivals', async (req, res) => {
   try {
-    const feeds = await getCachedFeeds();
+    // Fetch feeds and weather concurrently so weather latency never stacks on
+    // top of feed latency. Both are individually bounded (feed timeout in
+    // gtfs-fetcher, weather timeout in weather.js); weather is caught here so a
+    // weather failure can't reject the whole response.
+    const weatherPromise = config.weather?.enabled
+      ? getWeather(config.weather.lat, config.weather.lon).catch(() => null)
+      : Promise.resolve(undefined);
+
+    const [feeds, weather] = await Promise.all([getCachedFeeds(), weatherPromise]);
     const direction = config.direction;
 
     const result = {
@@ -69,13 +79,8 @@ router.get('/arrivals', async (req, res) => {
       };
     }
 
-    if (config.weather?.enabled) {
-      try {
-        result.weather = await getWeather(config.weather.lat, config.weather.lon);
-      } catch (weatherError) {
-        console.error('Weather fetch failed:', weatherError);
-        result.weather = null;
-      }
+    if (weather !== undefined) {
+      result.weather = weather;
     }
 
     res.json(result);

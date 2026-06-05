@@ -12,12 +12,19 @@ const USER_AGENT = 'subway-sign (https://github.com/jensenmatlock/subway-sign)';
 const FORECAST_TTL = 10 * 60 * 1000;
 const RAIN_PROB_THRESHOLD = 40;
 const RAIN_FORECAST_RE = /rain|shower|drizzle|thunderstorm/i;
+// Bound every NWS request so a hung weather fetch can't extend the shared
+// /api/arrivals response past the display client's timeout. A timeout rejects
+// the fetch, which getWeather's try/catch turns into a stale/null reading.
+const WEATHER_TIMEOUT_MS = 6000;
 
 let pointsCache = null;
 let forecastCache = { data: null, timestamp: 0 };
 
 async function nwsFetch(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/geo+json' } });
+  const res = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/geo+json' },
+    signal: AbortSignal.timeout(WEATHER_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`NWS ${res.status} on ${url}`);
   }
