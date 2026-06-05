@@ -36,7 +36,7 @@ sudo apt update && sudo apt upgrade -y
 echo ""
 echo "Step 2: Install dependencies"
 echo "----------------------------"
-sudo apt install -y git build-essential python3-dev python3-pip python3-pillow cython3 python3-setuptools
+sudo apt install -y git build-essential python3-dev python3-pip python3-pillow cython3 python3-setuptools dnsmasq-base
 
 echo ""
 echo "Step 3: Install Node.js 20.x"
@@ -60,7 +60,24 @@ else
 fi
 
 echo ""
-echo "Step 5: Install rpi-rgb-led-matrix library"
+echo "Step 5: Enable local DNS caching (NetworkManager + dnsmasq)"
+echo "----------------------------------------------------------"
+# The Pi re-resolves a couple of API hostnames every 30s. Without a local cache,
+# every lookup hits a remote resolver and intermittently stalls for seconds,
+# surfacing as feed timeouts and blank display rows. Cache locally and forward
+# misses to reliable public resolvers instead of the DHCP-provided ISP ones.
+if [ ! -f /etc/NetworkManager/conf.d/00-dns-cache.conf ]; then
+    printf '[main]\ndns=dnsmasq\n' | sudo tee /etc/NetworkManager/conf.d/00-dns-cache.conf > /dev/null
+    sudo mkdir -p /etc/NetworkManager/dnsmasq.d
+    printf 'server=1.1.1.1\nserver=1.0.0.1\nserver=8.8.8.8\n' | sudo tee /etc/NetworkManager/dnsmasq.d/upstream.conf > /dev/null
+    sudo systemctl reload NetworkManager
+    echo "Local DNS cache enabled (resolv.conf now points at 127.0.0.1)"
+else
+    echo "Local DNS cache already configured"
+fi
+
+echo ""
+echo "Step 6: Install rpi-rgb-led-matrix library"
 echo "------------------------------------------"
 RGB_MATRIX_DIR="$USER_HOME/rpi-rgb-led-matrix"
 if [ ! -d "$RGB_MATRIX_DIR" ]; then
@@ -75,18 +92,18 @@ else
 fi
 
 echo ""
-echo "Step 6: Install Node.js dependencies"
+echo "Step 7: Install Node.js dependencies"
 echo "------------------------------------"
 cd "$PROJECT_DIR/server"
 npm install --production
 
 echo ""
-echo "Step 7: Install Python dependencies"
+echo "Step 8: Install Python dependencies"
 echo "-----------------------------------"
 pip3 install -r "$PROJECT_DIR/display/requirements.txt"
 
 echo ""
-echo "Step 8: Verify installations"
+echo "Step 9: Verify installations"
 echo "----------------------------"
 echo "Node.js: $(node --version)"
 echo "npm: $(npm --version)"
