@@ -14,42 +14,42 @@ const config = JSON.parse(
 
 const router = Router();
 
-// Feed cache with TTL. Aligned to the display's poll interval so consecutive
-// sub-interval requests share one fetch (resilience to failed fetches is handled
-// by the per-feed last-good cache in gtfs-fetcher, not by this TTL).
+// Feeds and weather are refreshed on a background timer rather than on the
+// request path. This keeps the heavy GTFS protobuf decode (~520KB) off the
+// display's poll, so its CPU/memory burst no longer coincides with the matrix
+// frame swap — which was contending for memory bandwidth with the refresh
+// thread and causing visible flicker right before each update. Requests just
+// read these caches.
 let feedCache = { data: null, timestamp: 0 };
-const CACHE_TTL = config.server.refreshInterval;
+let weatherCache; // undefined until first weather refresh; null on failure
 
-/**
- * Get cached feeds or fetch fresh data
- */
-async function getCachedFeeds() {
-  const now = Date.now();
-  if (feedCache.data && (now - feedCache.timestamp) < CACHE_TTL) {
-    return feedCache.data;
+async function refreshAll() {
+  const tasks = [
+    fetchAllFeeds(config.feeds)
+      .then((d) => { feedCache = { data: d, timestamp: Date.now() }; })
+      .catch((e) => console.error('Feed refresh failed:', e)),
+  ];
+  if (config.weather?.enabled) {
+    tasks.push(
+      getWeather(config.weather.lat, config.weather.lon)
+        .then((w) => { weatherCache = w; })
+        .catch(() => { weatherCache = null; })
+    );
   }
-
-  console.log('Fetching fresh feed data...');
-  feedCache.data = await fetchAllFeeds(config.feeds);
-  feedCache.timestamp = now;
-  return feedCache.data;
+  await Promise.allSettled(tasks);
 }
+
+refreshAll(); // prime caches at startup
+setInterval(refreshAll, config.server.refreshInterval);
 
 /**
  * GET /api/arrivals
  * Main endpoint - returns arrivals for all configured rows
  */
-router.get('/arrivals', async (req, res) => {
+router.get('/arrivals', (req, res) => {
   try {
-    // Fetch feeds and weather concurrently so weather latency never stacks on
-    // top of feed latency. Both are individually bounded (feed timeout in
-    // gtfs-fetcher, weather timeout in weather.js); weather is caught here so a
-    // weather failure can't reject the whole response.
-    const weatherPromise = config.weather?.enabled
-      ? getWeather(config.weather.lat, config.weather.lon).catch(() => null)
-      : Promise.resolve(undefined);
-
-    const [feeds, weather] = await Promise.all([getCachedFeeds(), weatherPromise]);
+    // Read the background-refreshed caches — no fetch/decode on the request path.
+    const feeds = feedCache.data;
     const direction = config.direction;
 
     const result = {
@@ -61,7 +61,7 @@ router.get('/arrivals', async (req, res) => {
     // Process each row from config
     for (const [rowKey, rowConfig] of Object.entries(config.layout)) {
       const stationConfig = config.stations[rowConfig.station];
-      const feed = feeds[rowConfig.feed];
+      const feed = feeds ? feeds[rowConfig.feed] : null;
 
       const arrivals = getArrivalsForStop(
         feed,
@@ -79,8 +79,8 @@ router.get('/arrivals', async (req, res) => {
       };
     }
 
-    if (weather !== undefined) {
-      result.weather = weather;
+    if (config.weather?.enabled) {
+      result.weather = weatherCache ?? null;
     }
 
     res.json(result);
@@ -94,9 +94,9 @@ router.get('/arrivals', async (req, res) => {
  * GET /api/arrivals/raw
  * Debug endpoint - returns raw arrival data without formatting
  */
-router.get('/arrivals/raw', async (req, res) => {
+router.get('/arrivals/raw', (req, res) => {
   try {
-    const feeds = await getCachedFeeds();
+    const feeds = feedCache.data || {};
     const direction = config.direction;
 
     const result = {
@@ -174,9 +174,9 @@ router.get('/config', (req, res) => {
  * GET /api/health
  * Health check endpoint
  */
-router.get('/health', async (req, res) => {
+router.get('/health', (req, res) => {
   try {
-    const feeds = await getCachedFeeds();
+    const feeds = feedCache.data || {};
     const feedStatus = {};
 
     for (const [name, feed] of Object.entries(feeds)) {
@@ -186,7 +186,7 @@ router.get('/health', async (req, res) => {
     res.json({
       status: 'ok',
       timestamp: Date.now(),
-      cacheAge: Date.now() - feedCache.timestamp,
+      cacheAge: feedCache.timestamp ? Date.now() - feedCache.timestamp : null,
       feeds: feedStatus
     });
   } catch (error) {
