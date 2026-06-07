@@ -43,16 +43,22 @@ subway-sign/
 ├── config.json              # Station & display configuration
 ├── server/                  # Node.js API server
 │   ├── index.js
-│   └── lib/
-│       ├── gtfs-fetcher.js  # MTA feed fetcher
-│       ├── arrival-parser.js
-│       └── station-lookup.js
+│   ├── routes/
+│   │   └── api.js           # API endpoints (background feed refresh)
+│   ├── lib/
+│   │   ├── gtfs-fetcher.js  # MTA feed fetcher (per-feed last-good cache)
+│   │   ├── arrival-parser.js
+│   │   ├── weather.js       # NWS weather fetcher
+│   │   └── station-lookup.js
+│   └── test/                # node --test suites
 ├── display/                 # Python LED matrix display
 │   ├── main.py
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── test_*.py            # unittest suites
 └── scripts/                 # Setup & service install scripts
     ├── setup-pi.sh          # One-time Pi setup
-    └── install-services.sh  # Generates & installs systemd services
+    ├── install-services.sh  # Generates & installs systemd services
+    └── deploy.sh            # Auto-deploy (git pull + restart)
 ```
 
 ## Quick Start (Local Development)
@@ -293,6 +299,26 @@ If NWS is unreachable the display falls back to the last known reading. Set `"en
 }
 ```
 
+### Reduce Flicker
+
+The LED panel is refreshed by a CPU thread, so on a weaker Pi (e.g. Zero 2 W)
+the refresh can flicker. Two display options help:
+
+```json
+{
+  "display": {
+    "limit_refresh_rate_hz": 100,  // cap the rate so it stays steady (0 = unlimited)
+    "pwm_bits": 11                 // lower (e.g. 8) trades color depth for refresh headroom
+  }
+}
+```
+
+Capping `limit_refresh_rate_hz` to a steadily-sustainable rate removes the
+fluctuation that shows as flicker, with no color-depth cost. For the steady
+between-update flicker, also reserve a CPU core for the refresh thread with
+`isolcpus=3` in `/boot/firmware/cmdline.txt` (added automatically by
+`setup-pi.sh`; requires a reboot).
+
 ## MTA Feed Reference
 
 | Lines | Feed Key | Feed URL |
@@ -311,7 +337,7 @@ If NWS is unreachable the display falls back to the last known reading. Set `"en
 | Problem | Solution |
 |---------|----------|
 | No display output | Check ribbon cable orientation, verify power connections |
-| Flickering display | Increase `gpio_slowdown` in config (try 4, 5, or 6) |
+| Flickering display | See [Reduce Flicker](#reduce-flicker): set `limit_refresh_rate_hz` + `isolcpus=3`; as a last resort lower `pwm_bits` or adjust `gpio_slowdown` |
 | "Cannot connect to API" | Ensure server is running: `sudo systemctl status subway-server` |
 | Empty arrivals | Verify station ID and direction in config |
 | Very dim display | Increase brightness, verify 4A power supply |
