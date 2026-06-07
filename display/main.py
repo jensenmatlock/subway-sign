@@ -173,6 +173,11 @@ class SubwayDisplay:
         options.brightness = CONFIG['display']['brightness']
         options.gpio_slowdown = CONFIG['display']['gpio_slowdown']
         options.hardware_mapping = CONFIG['display'].get('hardware_mapping', 'regular')
+        # Capping the refresh rate to a steady, sustainable value keeps it from
+        # fluctuating when the frame redraws, which shows as flicker. pwm_bits
+        # trades color depth for refresh headroom if more is needed (default 11).
+        options.pwm_bits = CONFIG['display'].get('pwm_bits', 11)
+        options.limit_refresh_rate_hz = CONFIG['display'].get('limit_refresh_rate_hz', 0)
         options.drop_privileges = False
 
         self.matrix = RGBMatrix(options=options)

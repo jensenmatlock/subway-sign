@@ -17,7 +17,9 @@
     "cols": 64,
     "brightness": 50,
     "gpio_slowdown": 4,
-    "hardware_mapping": "regular"
+    "hardware_mapping": "regular",
+    "pwm_bits": 11,
+    "limit_refresh_rate_hz": 100
   },
   "layout": {
     "row1": {
