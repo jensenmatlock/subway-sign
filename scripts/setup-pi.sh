@@ -49,8 +49,8 @@ else
 fi
 
 echo ""
-echo "Step 4: Configure boot for LED matrix (disable audio + isolate CPU core)"
-echo "-----------------------------------------------------------------------"
+echo "Step 4: Configure boot cmdline (disable audio, isolate CPU core, enable memory cgroup)"
+echo "--------------------------------------------------------------------------------------"
 # Onboard audio shares the GPIO/PWM the matrix needs - blacklist it.
 if ! grep -q "blacklist snd_bcm2835" /etc/modprobe.d/blacklist-rgb-matrix.conf 2>/dev/null; then
     echo "blacklist snd_bcm2835" | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.conf
@@ -73,6 +73,21 @@ if [ -f "$CMDLINE" ] && ! grep -q "isolcpus=" "$CMDLINE"; then
     echo "Isolated CPU core 3 for the matrix - will take effect after reboot"
 else
     echo "CPU core isolation already configured (or cmdline.txt not found)"
+fi
+
+# Enable the memory cgroup controller. The Pi's device-tree injects
+# cgroup_disable=memory ahead of cmdline.txt, so the kernel boots with no memory
+# accounting - MemoryMax/MemoryHigh on the services are silently ignored. Append
+# cgroup_enable=memory (parsed after the DTB arg, so it wins) to turn it back on,
+# which lets subway-server's memory cap contain a Node RSS creep instead of
+# letting it starve the whole Pi into a zram/CPU livelock. Takes effect on reboot.
+if [ -f "$CMDLINE" ] && ! grep -q "cgroup_enable=memory" "$CMDLINE"; then
+    sudo mount -o remount,rw "$(dirname "$CMDLINE")" 2>/dev/null || true
+    sudo sed -i 's/[[:space:]]*$/ cgroup_enable=memory cgroup_memory=1/' "$CMDLINE"
+    sync
+    echo "Enabled memory cgroup controller - will take effect after reboot"
+else
+    echo "Memory cgroup controller already enabled (or cmdline.txt not found)"
 fi
 
 echo ""

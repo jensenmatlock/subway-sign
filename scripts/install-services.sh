@@ -35,6 +35,14 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 Environment=NODE_ENV=production
+# Contain the Node server's memory. If its RSS creeps past the hard cap, the
+# kernel kills it and Restart=always brings it back in ~10s (a brief NO DATA
+# blip) instead of the whole Pi starving into a zram/CPU-starvation livelock
+# that only a power cycle clears. Requires the memory cgroup controller enabled
+# in setup-pi.sh (cgroup_enable=memory). Tune to the observed steady-state RSS.
+MemoryAccounting=yes
+MemoryHigh=160M
+MemoryMax=200M
 
 [Install]
 WantedBy=multi-user.target
