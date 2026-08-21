@@ -115,6 +115,7 @@ ROW_POSITIONS = {
 # and from every MTA line bullet color.
 WEATHER_COLOR = (80, 220, 220)
 RAIN_COLOR = (80, 140, 220)
+SNOW_COLOR = (200, 225, 255)
 
 # Brightness multiplier applied to the weather glyphs during off-schedule hours,
 # when the train rows are blanked. Keeps the temperature legible but visibly muted.
@@ -147,7 +148,7 @@ class SubwayDisplay:
         matrix doesn't flicker on no-op refresh cycles.
         """
         weather = (data or {}).get('weather') or {}
-        weather_part = (weather.get('temperature'), weather.get('rain'))
+        weather_part = (weather.get('temperature'), weather.get('precip'))
 
         if not draw_arrivals:
             return ('weather-only', weather_part)
@@ -345,8 +346,22 @@ class SubwayDisplay:
                 if ch == '#':
                     self.canvas.SetPixel(x + dx, y + dy, *rgb)
 
+    def _draw_snowflake(self, x, y, rgb):
+        """Draw a 5x5 snowflake glyph anchored at (x, y)."""
+        pattern = [
+            "#.#.#",
+            ".###.",
+            "#####",
+            ".###.",
+            "#.#.#",
+        ]
+        for dy, row in enumerate(pattern):
+            for dx, ch in enumerate(row):
+                if ch == '#':
+                    self.canvas.SetPixel(x + dx, y + dy, *rgb)
+
     def draw_weather(self, weather, dim=False):
-        """Draw temperature + optional rain glyph at the top-right of row 1.
+        """Draw temperature + optional precipitation glyph at the top-right of row 1.
 
         `dim` mutes the glyph colors for off-schedule hours, when the train
         rows are blanked but the weather stays on.
@@ -356,9 +371,9 @@ class SubwayDisplay:
 
         if not HAS_MATRIX:
             unit = weather.get('unit', 'F')
-            rain = weather.get('rain')
+            precip = weather.get('precip')
             stale = weather.get('stale', False)
-            print(f"  weather: {weather['temperature']}°{unit} rain={rain} stale={stale} dim={dim}", flush=True)
+            print(f"  weather: {weather['temperature']}°{unit} precip={precip} stale={stale} dim={dim}", flush=True)
             return
 
         text = f"{weather['temperature']}°"
@@ -366,17 +381,25 @@ class SubwayDisplay:
         text_width = len(text) * 6 - 1
         x = 64 - text_width
 
+        # 'rain' | 'snow' | None — the server decides both type and whether it
+        # clears the probability threshold, so None simply means draw nothing.
+        precip = weather.get('precip')
+        glyph, glyph_rgb = {
+            'rain': (self._draw_droplet, RAIN_COLOR),
+            'snow': (self._draw_snowflake, SNOW_COLOR),
+        }.get(precip, (None, None))
+
         weather_rgb = WEATHER_COLOR
-        rain_rgb = RAIN_COLOR
         if dim:
             weather_rgb = _dim_color(weather_rgb, WEATHER_DIM_FACTOR)
-            rain_rgb = _dim_color(rain_rgb, WEATHER_DIM_FACTOR)
+            if glyph_rgb is not None:
+                glyph_rgb = _dim_color(glyph_rgb, WEATHER_DIM_FACTOR)
 
         weather_color = graphics.Color(*weather_rgb)
         graphics.DrawText(self.canvas, self.font, x, 7, weather_color, text)
 
-        if weather.get('rain'):
-            self._draw_droplet(x - 7, 2, rain_rgb)
+        if glyph is not None:
+            glyph(x - 7, 2, glyph_rgb)
 
     def draw_error(self, message):
         """Display an error message."""

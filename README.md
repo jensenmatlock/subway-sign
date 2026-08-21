@@ -275,7 +275,7 @@ The server keeps polling MTA during off-hours, so the first frame after wake-up 
 
 ### Weather
 
-Top-right of row 1 shows the current temperature and a small droplet glyph when rain is likely in the next hour. Data comes from the National Weather Service (`api.weather.gov`) — no API key, US-only, 10-minute server-side cache.
+Top-right of row 1 shows the current temperature and a small precipitation glyph — a droplet for rain, a snowflake for snow — when precipitation is at least 40% likely in the next hour. Data comes from the National Weather Service (`api.weather.gov`) — no API key, US-only, 10-minute server-side cache.
 
 ```json
 {

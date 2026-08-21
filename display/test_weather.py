@@ -1,6 +1,12 @@
 import unittest
 
-from main import _dim_color, WEATHER_COLOR, RAIN_COLOR, WEATHER_DIM_FACTOR
+from main import (
+    _dim_color,
+    WEATHER_COLOR,
+    RAIN_COLOR,
+    SNOW_COLOR,
+    WEATHER_DIM_FACTOR,
+)
 
 
 class TestDimColor(unittest.TestCase):
@@ -11,12 +17,31 @@ class TestDimColor(unittest.TestCase):
         self.assertEqual(_dim_color(WEATHER_COLOR, 1.0), WEATHER_COLOR)
 
     def test_dimmed_is_strictly_darker(self):
-        for rgb in (WEATHER_COLOR, RAIN_COLOR):
+        for rgb in (WEATHER_COLOR, RAIN_COLOR, SNOW_COLOR):
             dimmed = _dim_color(rgb, WEATHER_DIM_FACTOR)
             self.assertTrue(all(d < c for d, c in zip(dimmed, rgb) if c > 0))
 
     def test_clamps_to_byte_range(self):
         self.assertEqual(_dim_color((300, 10, 0), 1.0), (255, 10, 0))
+
+
+class TestGlyphColors(unittest.TestCase):
+    """The two precipitation glyphs must stay tellable apart from each other and
+    from the temperature text, at full brightness and dimmed."""
+
+    def test_glyph_colors_are_distinct(self):
+        self.assertNotEqual(RAIN_COLOR, SNOW_COLOR)
+        self.assertNotEqual(RAIN_COLOR, WEATHER_COLOR)
+        self.assertNotEqual(SNOW_COLOR, WEATHER_COLOR)
+
+    def test_glyph_colors_stay_distinct_when_dimmed(self):
+        dim = lambda rgb: _dim_color(rgb, WEATHER_DIM_FACTOR)
+        self.assertNotEqual(dim(RAIN_COLOR), dim(SNOW_COLOR))
+        self.assertNotEqual(dim(SNOW_COLOR), dim(WEATHER_COLOR))
+
+    def test_dimmed_snow_stays_visible(self):
+        # Snow is the palest glyph, so it is the one at risk of dimming to black.
+        self.assertTrue(all(c > 0 for c in _dim_color(SNOW_COLOR, WEATHER_DIM_FACTOR)))
 
 
 if __name__ == "__main__":
