@@ -224,7 +224,7 @@ Continuation of the above in the same session. Plan:
 | 1. Classifier replaces two-trigger gate | **Done** | `classifyPrecip()` exported; single `PRECIP_THRESHOLD = 40`. `RAIN_PROB_THRESHOLD`/`RAIN_TEXT_FLOOR` removed. |
 | 2. Snowflake glyph | **Done** | `_draw_snowflake` + `SNOW_COLOR = (200, 225, 255)`; `draw_weather` dispatches on `precip` via a lookup table; `_compute_state_key` updated. |
 | 3. Tests | **Done** | `server/test/weather.test.js` rewritten: 47 tests. `display/test_weather.py` extended to 7. |
-| 4. Docs | **Done** | `OPERATIONS.md:79,81-82,124` and `README.md:278`. |
+| 4. Docs | **Done** | `README.md:278`, plus `OPERATIONS.md:79,81-82,124` — note OPERATIONS.md is gitignored (`.gitignore:27`), so those edits are on disk but will never appear in a commit diff. |
 | 5. Reconciliation | **Done** | This section. |
 
 ### Adjustments from the plan
@@ -256,6 +256,8 @@ Continuation of the above in the same session. Plan:
 
 The snowflake has **not** been seen on real hardware — there was no snow in the
 NYC forecast to trigger it, and there is no matrix on the dev machine (tests run
-in simulation mode). The 5x5 pattern and its color are verified only by unit
-test and ASCII preview. Worth a look on the Pi the first time it renders, and
-`SNOW_COLOR` may need tuning against the panel's actual output.
+in simulation mode). `SNOW_COLOR` is unit-tested for distinctness and dim
+survival; the 5x5 **pattern itself has no test at all** and was checked only by
+ASCII preview (an earlier draft of this note claimed unit-test coverage for the
+pattern — it never had any). Worth a look on the Pi the first time it renders,
+and `SNOW_COLOR` may need tuning against the panel's actual output.

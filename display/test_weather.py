@@ -2,6 +2,7 @@ import unittest
 
 from main import (
     _dim_color,
+    SubwayDisplay,
     WEATHER_COLOR,
     RAIN_COLOR,
     SNOW_COLOR,
@@ -42,6 +43,48 @@ class TestGlyphColors(unittest.TestCase):
     def test_dimmed_snow_stays_visible(self):
         # Snow is the palest glyph, so it is the one at risk of dimming to black.
         self.assertTrue(all(c > 0 for c in _dim_color(SNOW_COLOR, WEATHER_DIM_FACTOR)))
+
+
+def _frame(precip, temperature=63):
+    return {
+        "rows": {"row1": {"arrivals": [{"route": "B", "minutesUntil": 7}]}},
+        "weather": {"temperature": temperature, "precip": precip},
+    }
+
+
+class TestComputeStateKey(unittest.TestCase):
+    """update() skips Clear+Swap when this key is unchanged, so the key is what
+    decides whether a glyph change actually reaches the panel. A precip change
+    that doesn't move the key renders a stale glyph until something else does."""
+
+    def test_precip_change_changes_the_key(self):
+        key = SubwayDisplay._compute_state_key
+        rain = key(_frame("rain"), True)
+        snow = key(_frame("snow"), True)
+        clear = key(_frame(None), True)
+        self.assertNotEqual(rain, snow)
+        self.assertNotEqual(rain, clear)
+        self.assertNotEqual(snow, clear)
+
+    def test_identical_frames_share_a_key(self):
+        # The flicker guard: no spurious redraw when nothing changed.
+        key = SubwayDisplay._compute_state_key
+        self.assertEqual(key(_frame("snow"), True), key(_frame("snow"), True))
+
+    def test_temperature_change_changes_the_key(self):
+        key = SubwayDisplay._compute_state_key
+        self.assertNotEqual(key(_frame("rain", 63), True), key(_frame("rain", 64), True))
+
+    def test_precip_still_counts_when_arrivals_are_blanked(self):
+        # Off-schedule hours blank the rows but keep weather on, so a glyph
+        # change overnight still has to force a redraw.
+        key = SubwayDisplay._compute_state_key
+        self.assertNotEqual(key(_frame("rain"), False), key(_frame("snow"), False))
+
+    def test_missing_weather_is_handled(self):
+        key = SubwayDisplay._compute_state_key
+        self.assertEqual(key({"rows": {}}, True), key({"rows": {}, "weather": None}, True))
+        self.assertIsNotNone(key(None, True))
 
 
 if __name__ == "__main__":

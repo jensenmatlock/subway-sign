@@ -68,8 +68,11 @@ async function getForecastHourlyUrl(lat, lon) {
 //      common wet wording, "Showers And Thunderstorms", contains no "Rain".
 //   3. Then dry — fog reaches 51% probability, clearing the threshold below
 //      without being precipitation, so it has to short-circuit the fallback.
-//   4. Fallback to rain for precipitation we don't have wording for yet
-//      (freezing rain, sleet, wintry mix and friends are unverified here).
+//   4. Fallback to rain for wording none of the three patterns claim — a
+//      droplet is the safer default for an unknown code than nothing at all.
+//      Winter wording is NOT this case: sleet, wintry mix and freezing
+//      rain/drizzle are all matched by SNOW_RE at step 1. Genuine fallback
+//      material is rarer still ("Ice Crystals", "Volcanic Ash").
 export function classifyPrecip(shortForecast) {
   const text = shortForecast || '';
   if (SNOW_RE.test(text)) return 'snow';

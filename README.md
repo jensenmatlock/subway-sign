@@ -287,7 +287,7 @@ Top-right of row 1 shows the current temperature and a small precipitation glyph
 }
 ```
 
-If NWS is unreachable the display falls back to the last known reading. Set `"enabled": false` to skip weather entirely.
+If NWS is unreachable the display falls back to the last known reading for up to 60 minutes, after which the temperature and glyph disappear entirely rather than show a stale value. Set `"enabled": false` to skip weather entirely.
 
 ### Adjust Brightness
 

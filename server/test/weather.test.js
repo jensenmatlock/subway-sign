@@ -205,6 +205,46 @@ test('drops the reading entirely once it passes the staleness cap', async (t) =>
   assert.equal(await getWeather(40.7785, -73.9821), null);
 });
 
+test('a reading exactly at the cap is dropped', async (t) => {
+  // Pins `ageMs < MAX_STALE_MS` against a drift to `<=`. 60 min on the dot is
+  // the only input that tells the two apart.
+  t.mock.timers.enable({ apis: ['Date'] });
+  const { getWeather } = await freshWeatherModule();
+
+  let fail = false;
+  stubFetch(t, nwsStub(() => {
+    if (fail) throw new Error('simulated NWS outage');
+    return okForecast(50, 'Chance Rain Showers', 68);
+  }));
+
+  await getWeather(40.7785, -73.9821);
+
+  fail = true;
+  t.mock.timers.tick(60 * 60 * 1000);
+
+  assert.equal(await getWeather(40.7785, -73.9821), null);
+});
+
+test('a reading one tick under the cap is still served', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  const { getWeather } = await freshWeatherModule();
+
+  let fail = false;
+  stubFetch(t, nwsStub(() => {
+    if (fail) throw new Error('simulated NWS outage');
+    return okForecast(50, 'Chance Rain Showers', 68);
+  }));
+
+  await getWeather(40.7785, -73.9821);
+
+  fail = true;
+  t.mock.timers.tick(60 * 60 * 1000 - 1);
+
+  const stale = await getWeather(40.7785, -73.9821);
+  assert.equal(stale.temperature, 68);
+  assert.equal(stale.stale, true);
+});
+
 test('returns null when a fetch has never succeeded', async (t) => {
   const { getWeather } = await freshWeatherModule();
   stubFetch(t, async () => { throw new Error('simulated NWS outage'); });
