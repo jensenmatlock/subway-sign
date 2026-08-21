@@ -25,3 +25,7 @@ npm-debug.log*
 
 # Private operational notes
 OPERATIONS.md
+
+# Claude Code local session state (the plan archive in .claude/plans is tracked)
+.claude/settings.local.json
+.claude/.active-session
