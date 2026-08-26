@@ -103,6 +103,8 @@ LINE_COLORS = {
     'S': (128, 128, 128),
 }
 
+PANEL_WIDTH = 64
+
 # Row Y positions for 32-pixel height display (3 rows filling full height)
 # Each row is 10px tall with 1px gaps: 0-9, 11-20, 22-31
 ROW_POSITIONS = {
@@ -117,14 +119,52 @@ WEATHER_COLOR = (80, 220, 220)
 RAIN_COLOR = (80, 140, 220)
 SNOW_COLOR = (200, 225, 255)
 
-# Brightness multiplier applied to the weather glyphs during off-schedule hours,
-# when the train rows are blanked. Keeps the temperature legible but visibly muted.
-WEATHER_DIM_FACTOR = 0.4
+# Off-schedule clock: neutral gray so it reads as a clock rather than part of
+# the cyan weather block sharing row 1, drawn hard against the left edge.
+CLOCK_COLOR = (200, 200, 200)
+CLOCK_X = 1
+
+# Brightness multiplier applied to everything drawn during off-schedule hours,
+# when the train rows are blanked. Keeps the temperature and clock legible but
+# visibly muted in a dark room.
+DIM_FACTOR = 0.25
 
 
 def _dim_color(rgb, factor):
     """Scale an (r, g, b) tuple by `factor`, clamping to the 0-255 range."""
     return tuple(max(0, min(255, int(c * factor))) for c in rgb)
+
+
+def text_width(text):
+    """Pixel width of `text` in the 5x8 font: 5 px per glyph, 1 px advance."""
+    return len(text) * 6 - 1
+
+
+def clock_right_edge(text):
+    """First x free to the right of a clock drawn at CLOCK_X, plus a 1px gap."""
+    return CLOCK_X + text_width(text) + 1
+
+
+def weather_text_x(text):
+    """Left x of the right-aligned weather text on row 1."""
+    return PANEL_WIDTH - text_width(text)
+
+
+def weather_glyph_x(text):
+    """Left x of the 5x5 precip glyph, which sits left of the weather text."""
+    return weather_text_x(text) - 7
+
+
+def format_clock(now):
+    """Format `now` as a compact 12-hour clock, e.g. '9:47p' / '12:03a'.
+
+    No space before the suffix and no leading zero on the hour: at 6 chars
+    worst case ('12:47p') this is the widest the clock ever gets, which is what
+    the row 1 pixel budget in draw_weather() is sized against.
+    """
+    hour = now.hour % 12 or 12
+    suffix = 'p' if now.hour >= 12 else 'a'
+    return f"{hour}:{now.minute:02d}{suffix}"
 
 
 class SubwayDisplay:
@@ -141,17 +181,18 @@ class SubwayDisplay:
             self._init_matrix()
 
     @staticmethod
-    def _compute_state_key(data, draw_arrivals):
+    def _compute_state_key(data, draw_arrivals, clock_text=None):
         """Build a comparable key representing what would be drawn.
 
         Skips a redraw when this key matches the previous frame so the
-        matrix doesn't flicker on no-op refresh cycles.
+        matrix doesn't flicker on no-op refresh cycles. `clock_text` is part of
+        the key so the off-schedule clock still redraws on the minute.
         """
         weather = (data or {}).get('weather') or {}
         weather_part = (weather.get('temperature'), weather.get('precip'))
 
         if not draw_arrivals:
-            return ('weather-only', weather_part)
+            return ('weather-only', weather_part, clock_text)
 
         if not data or 'rows' not in data:
             return ('no-data', weather_part)
@@ -360,11 +401,27 @@ class SubwayDisplay:
                 if ch == '#':
                     self.canvas.SetPixel(x + dx, y + dy, *rgb)
 
-    def draw_weather(self, weather, dim=False):
+    def draw_clock(self, text):
+        """Draw the current time at the left of row 1, always dimmed.
+
+        Only used off-schedule, where rows 2-3 are blank; the clock shares row 1
+        with the weather block on the right.
+        """
+        if not HAS_MATRIX:
+            print(f"  clock: {text}", flush=True)
+            return
+
+        color = graphics.Color(*_dim_color(CLOCK_COLOR, DIM_FACTOR))
+        graphics.DrawText(self.canvas, self.font, CLOCK_X, 7, color, text)
+
+    def draw_weather(self, weather, dim=False, left_bound=0):
         """Draw temperature + optional precipitation glyph at the top-right of row 1.
 
-        `dim` mutes the glyph colors for off-schedule hours, when the train
-        rows are blanked but the weather stays on.
+        `dim` mutes the colors for off-schedule hours, when the train rows are
+        blanked but the weather stays on. `left_bound` is the first x the block
+        may use: off-schedule the clock owns the left of row 1, and the glyph is
+        dropped rather than overlapped in the rare case they'd both want the
+        same pixels (a 4-char temperature such as `-12` alongside a 6-char clock).
         """
         if not weather or weather.get('temperature') is None:
             return
@@ -377,9 +434,7 @@ class SubwayDisplay:
             return
 
         text = f"{weather['temperature']}°"
-        # 5x8 font: each glyph is 5 px wide with 1 px advance, so n chars = 6n-1 px.
-        text_width = len(text) * 6 - 1
-        x = 64 - text_width
+        x = weather_text_x(text)
 
         # 'rain' | 'snow' | None — the server decides both type and whether it
         # clears the probability threshold, so None simply means draw nothing.
@@ -391,15 +446,16 @@ class SubwayDisplay:
 
         weather_rgb = WEATHER_COLOR
         if dim:
-            weather_rgb = _dim_color(weather_rgb, WEATHER_DIM_FACTOR)
+            weather_rgb = _dim_color(weather_rgb, DIM_FACTOR)
             if glyph_rgb is not None:
-                glyph_rgb = _dim_color(glyph_rgb, WEATHER_DIM_FACTOR)
+                glyph_rgb = _dim_color(glyph_rgb, DIM_FACTOR)
 
         weather_color = graphics.Color(*weather_rgb)
         graphics.DrawText(self.canvas, self.font, x, 7, weather_color, text)
 
-        if glyph is not None:
-            glyph(x - 7, 2, glyph_rgb)
+        glyph_x = weather_glyph_x(text)
+        if glyph is not None and glyph_x >= left_bound:
+            glyph(glyph_x, 2, glyph_rgb)
 
     def draw_error(self, message):
         """Display an error message."""
@@ -410,14 +466,16 @@ class SubwayDisplay:
         red = graphics.Color(255, 0, 0)
         graphics.DrawText(self.canvas, self.font, 2, 17, red, message[:12])
 
-    def update(self, data, draw_arrivals=True):
+    def update(self, data, draw_arrivals=True, now=None):
         """Update the display.
 
-        draw_arrivals=False blanks the train rows but still renders weather —
-        used during off-schedule hours so the temperature stays visible.
-        Skips the redraw entirely when the rendered state would be unchanged.
+        draw_arrivals=False blanks the train rows but still renders weather and
+        the current time — used during off-schedule hours so the temperature and
+        clock stay visible. Skips the redraw entirely when the rendered state
+        would be unchanged.
         """
-        state_key = self._compute_state_key(data, draw_arrivals)
+        clock_text = None if draw_arrivals else format_clock(now or datetime.now())
+        state_key = self._compute_state_key(data, draw_arrivals, clock_text)
         if HAS_MATRIX and state_key == self._last_state_key:
             return
         self._last_state_key = state_key
@@ -436,7 +494,14 @@ class SubwayDisplay:
             else:
                 self.draw_error("NO DATA")
 
-        self.draw_weather(weather, dim=not draw_arrivals)
+        if clock_text is not None:
+            self.draw_clock(clock_text)
+
+        self.draw_weather(
+            weather,
+            dim=not draw_arrivals,
+            left_bound=clock_right_edge(clock_text) if clock_text else 0,
+        )
 
         if HAS_MATRIX:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
@@ -490,7 +555,8 @@ def main():
 
     try:
         while True:
-            schedule_on = is_display_on(datetime.now(), CONFIG.get("schedule"))
+            now = datetime.now()
+            schedule_on = is_display_on(now, CONFIG.get("schedule"))
             fetched = fetch_arrivals()
             data, last_good, failures = choose_render_data(
                 fetched, last_good, failures, MAX_CONSECUTIVE_FAILURES
@@ -506,7 +572,7 @@ def main():
             else:
                 print(f"[{ts}] Updated arrivals:", flush=True)
 
-            display.update(data, draw_arrivals=schedule_on)
+            display.update(data, draw_arrivals=schedule_on, now=now)
             sys.stdout.flush()
             time.sleep(refresh_seconds)
 

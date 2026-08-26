@@ -259,7 +259,7 @@ This shows the 1 train with its own bullet and times, and merges 2/3 express tim
 
 ### Schedule On/Off
 
-Blank train arrivals outside configured hours so the display isn't distracting at night. The weather indicator (top-right) stays on continuously, but dims to a muted glow during off-schedule hours so it's unobtrusive at night. Times are local Pi time (set timezone to `America/New_York` in the imager).
+Blank train arrivals outside configured hours so the display isn't distracting at night. Row 1 stays lit: the weather indicator (top-right) runs continuously, and the current time (top-left, 12-hour, e.g. `10:07p`) is added off-schedule. Both drop to a muted glow off-schedule (`DIM_FACTOR` in `display/main.py`, 0.25) so they're unobtrusive in a dark room. The clock follows the refresh interval, so it can lag a minute rollover by up to `server.refreshInterval`. Times are local Pi time (set timezone to `America/New_York` in the imager).
 
 ```json
 {
