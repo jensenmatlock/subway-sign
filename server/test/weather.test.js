@@ -74,6 +74,8 @@ function period(probability, shortForecast, temperature = 72) {
 
 const GATE = [
   // [probability, shortForecast, expected precip, why]
+  // A single-period window, so the gate is exercised on its own without the
+  // look-ahead in play. Multi-period behaviour is covered further down.
   [18, 'Slight Chance Rain Showers', null, 'below the gate'],
   [39, 'Chance Rain Showers', null, 'just below the gate'],
   [40, 'Chance Rain Showers', 'rain', 'at the gate'],
@@ -88,37 +90,129 @@ const GATE = [
 
 for (const [probability, shortForecast, expected, why] of GATE) {
   test(`precip=${expected} at ${probability}% "${shortForecast}" (${why})`, () => {
-    assert.equal(buildResult(period(probability, shortForecast)).precip, expected);
+    assert.equal(buildResult([period(probability, shortForecast)]).precip, expected);
   });
 }
 
 test('a null probabilityOfPrecipitation coerces to 0, not to precipitation', () => {
-  const result = buildResult({
+  const result = buildResult([{
     probabilityOfPrecipitation: { value: null },
     shortForecast: 'Chance Rain Showers',
     temperature: 61,
-  });
+  }]);
   assert.equal(result.precip, null);
 });
 
 test('a missing probabilityOfPrecipitation coerces to 0, not to precipitation', () => {
-  const result = buildResult({ shortForecast: 'Rain Showers', temperature: 61 });
+  const result = buildResult([{ shortForecast: 'Rain Showers', temperature: 61 }]);
   assert.equal(result.precip, null);
 });
 
 test('temperature is rounded and the unit defaults to F', () => {
-  const result = buildResult({
+  const result = buildResult([{
     probabilityOfPrecipitation: { value: 0 },
     shortForecast: 'Sunny',
     temperature: 71.6,
-  });
+  }]);
   assert.equal(result.temperature, 72);
   assert.equal(result.unit, 'F');
 });
 
 test('the payload carries precip and no legacy rain field', () => {
-  const result = buildResult(period(80, 'Snow Showers'));
+  const result = buildResult([period(80, 'Snow Showers')]);
   assert.deepEqual(Object.keys(result).sort(), ['precip', 'temperature', 'unit']);
+});
+
+// --- buildResult: the look-ahead window ------------------------------------
+//
+// periods[0] is the hour we are currently inside; the glyph answers for the
+// first LOOKAHEAD_PERIODS of them. These tests pin the window's width from
+// both directions, its tie-break, and the split between which period supplies
+// the temperature and which supplies the glyph.
+
+test('rain in the next hour lights the glyph while the current hour is dry', () => {
+  // The reported bug, verbatim: at 07:46 on 2026-08-27 the 07:00 period read
+  // 1% / "Partly Sunny" and the 08:00 period read 40% / "Chance Rain Showers".
+  // Reading periods[0] alone showed nothing 14 minutes before the rain window.
+  const result = buildResult([
+    period(1, 'Partly Sunny', 72),
+    period(40, 'Chance Rain Showers', 73),
+  ]);
+  assert.equal(result.precip, 'rain');
+  assert.equal(result.temperature, 72, 'temperature still reads the current hour');
+});
+
+test('rain in the last hour of the window still lights the glyph', () => {
+  // Pins the window's width from below: the third period is the last one
+  // inside it. Narrowing LOOKAHEAD_PERIODS is what this test catches.
+  const result = buildResult([
+    period(1, 'Partly Sunny'),
+    period(4, 'Mostly Cloudy'),
+    period(65, 'Rain Showers Likely'),
+  ]);
+  assert.equal(result.precip, 'rain');
+});
+
+test('rain past the window does not light the glyph', () => {
+  // Pins the width from above: the fourth period is outside the window.
+  // Widening LOOKAHEAD_PERIODS is what this test catches. Together with the
+  // test above, the pair fixes the window at exactly 3 rather than "at least".
+  const result = buildResult([
+    period(1, 'Partly Sunny'),
+    period(4, 'Mostly Cloudy'),
+    period(2, 'Sunny'),
+    period(90, 'Showers And Thunderstorms Likely'),
+  ]);
+  assert.equal(result.precip, null);
+});
+
+test('the glyph is classified from the wettest period, not the current one', () => {
+  // Pairing the later hour's probability with the current hour's wording would
+  // pass "Mostly Cloudy" to classifyPrecip and draw nothing; pairing it with a
+  // rain wording would draw a droplet for snow. Both are wrong here.
+  const result = buildResult([
+    period(2, 'Mostly Cloudy'),
+    period(85, 'Snow Showers Likely'),
+  ]);
+  assert.equal(result.precip, 'snow');
+});
+
+test('a dry later hour does not suppress precipitation happening now', () => {
+  // The window takes a max, not the last period — rain now and clearing later
+  // still warrants the glyph.
+  const result = buildResult([
+    period(75, 'Rain Showers'),
+    period(3, 'Sunny'),
+  ]);
+  assert.equal(result.precip, 'rain');
+});
+
+test('an equal probability across the window describes the nearer hour', () => {
+  // Pins the `>` in the reduce against a drift to `>=`. Identical probabilities
+  // with differing wording is the only input that tells the two apart, and NWS
+  // does emit flat probabilities across adjacent hours (40/40/40 in the
+  // 2026-08-27 sample above).
+  const result = buildResult([
+    period(60, 'Rain Showers'),
+    period(60, 'Snow Showers'),
+  ]);
+  assert.equal(result.precip, 'rain');
+});
+
+test('a window shorter than LOOKAHEAD_PERIODS is handled', () => {
+  // slice() past the end is safe; this pins that the tail of the forecast
+  // doesn't need special casing, at both one and two periods short.
+  assert.equal(buildResult([period(80, 'Rain Showers')]).precip, 'rain');
+  assert.equal(
+    buildResult([period(3, 'Sunny'), period(80, 'Rain Showers')]).precip,
+    'rain',
+  );
+});
+
+test('no forecast periods throws rather than returning a bogus reading', () => {
+  // getWeather's catch turns this into a stale-or-null reading. Returning a
+  // half-built object instead would put NaN on the sign.
+  assert.throws(() => buildResult([]), /no forecast periods/);
 });
 
 // --- getWeather: staleness cap --------------------------------------------
@@ -153,11 +247,18 @@ function nwsStub(forecast) {
   };
 }
 
+// A dry second period, so these cache tests turn on the first period alone and
+// stay independent of the look-ahead window's width.
 function okForecast(probability, shortForecast, temperature) {
   return {
     ok: true,
     json: async () => ({
-      properties: { periods: [period(probability, shortForecast, temperature)] },
+      properties: {
+        periods: [
+          period(probability, shortForecast, temperature),
+          period(0, 'Sunny', temperature),
+        ],
+      },
     }),
   };
 }
@@ -250,4 +351,34 @@ test('returns null when a fetch has never succeeded', async (t) => {
   stubFetch(t, async () => { throw new Error('simulated NWS outage'); });
 
   assert.equal(await getWeather(40.7785, -73.9821), null);
+});
+
+// --- getWeather: the periods handoff ---------------------------------------
+
+test('a wet later hour reaches the glyph through getWeather', async (t) => {
+  // Pins the seam buildResult's own tests cannot reach: getWeather has to hand
+  // over the whole periods array. A regression to buildResult([periods[0]])
+  // would leave every window test above passing and silently restore the
+  // original bug — a dry current hour hiding rain an hour out.
+  //
+  // The periods are the real NWS readings from 2026-08-27, the morning the bug
+  // was reported: 07:00 was 1% / "Partly Sunny" while 08:00 had already gone
+  // to 40% / "Chance Rain Showers".
+  const { getWeather } = await freshWeatherModule();
+  stubFetch(t, nwsStub(() => ({
+    ok: true,
+    json: async () => ({
+      properties: {
+        periods: [
+          period(1, 'Partly Sunny', 72),
+          period(40, 'Chance Rain Showers', 73),
+          period(40, 'Chance Rain Showers', 76),
+        ],
+      },
+    }),
+  })));
+
+  const result = await getWeather(40.7785, -73.9821);
+  assert.equal(result.precip, 'rain');
+  assert.equal(result.temperature, 72, 'temperature still reads the current hour');
 });
